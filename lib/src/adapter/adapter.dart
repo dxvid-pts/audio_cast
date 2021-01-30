@@ -9,7 +9,7 @@ final List<CastAdapter> adapters = [
   // AirplayMobileAdapter(), //2
 ];
 
-class CastAdapter {
+abstract class CastAdapter {
   DeviceListNotifier devices = DeviceListNotifier();
 
   void initialize() {}
@@ -22,11 +22,11 @@ class CastAdapter {
 
   Future<void> disconnect() async {}
 
-  Future<bool> play() async => true;
+  Future<void> play() async => true;
 
-  Future<bool> pause() async => true;
+  Future<void> pause() async => true;
 
-  Future<bool> seek() async => true;
+  Future<void> seek() async => true;
 
   Future<void> lowerVolume() async {}
 

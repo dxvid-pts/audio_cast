@@ -8,10 +8,11 @@ bool _engineInitiated = false;
 final DeviceListNotifier _devices = DeviceListNotifier();
 final CurrentPlaybackStateNotifier _currentPlaybackState =
     CurrentPlaybackStateNotifier();
+
+final CurrentCastStateNotifier currentCastState = CurrentCastStateNotifier();
 //final CurrentDeviceNotifier _currentPlaybackDevice = CurrentDeviceNotifier();
 
 class AudioCast {
-  //static final ValueNotifier<CastState> currentCastState = ValueNotifier(CastState.DISCONNECTED);
   static Device _currentPlaybackDevice;
 
   static void startDiscovery() async {
@@ -37,68 +38,98 @@ class AudioCast {
   }
 
   static Future<void> connectToDevice(Device device) async {
-    //not connecte to a cast device
-    // if (currentCastState.value == CastState.DISCONNECTED) {
-    await adapters[device.adapterId].connect(device);
-    _currentPlaybackDevice = device;
-    //  }
-    /*  //connected to a cast device
-    else {
-      //not same device selected TODO: Add port?
-      if (currentPlaybackDevice.value.host != device.host) {
-        //disconnect current device
-        await adapters[currentPlaybackDevice.value.adapterId].disconnect();
+    currentCastState.setState(CastState.CONNECTING);
 
-        //connect to new device
+    try {
+      //not connecte to a cast device
+      if (currentCastState.state == CastState.DISCONNECTED) {
         await adapters[device.adapterId].connect(device);
       }
-    }*/
+      //connected to a cast device
+      else {
+        //not same device selected -> disconnect old + connect to new device TODO: Add port?
+        if (_currentPlaybackDevice.host != device.host) {
+          //disconnect current device
+          await _currentAdapter.disconnect();
+
+          //connect to new device
+          await adapters[device.adapterId].connect(device);
+        }
+      }
+
+      //connecting succeeded
+      _currentPlaybackDevice = device;
+      currentCastState.setState(CastState.CONNECTED);
+    }
+    //connecting failed
+    catch (e) {
+      _currentPlaybackDevice = null;
+      currentCastState.setState(CastState.DISCONNECTED);
+
+      //TODO improve error handling
+      print('[audio_cast] failed: $e');
+    }
   }
 
   static void castAudioFromUrl(String url, {Duration start}) async {
-    /*//TODO switch to switch :)
-    //TODO better error msg
-    if (currentCastState.value == CastState.DISCONNECTED)
-      throw ("Not connected to a device!");
-
-    //TODO
-    /*  if(currentCastState.value == CastState.CONNECTING){
-      var listener = () {
-        if(currentCastState.value == CastState.DISCONNECTED)
-          print("throw");
-      };
-      currentCastState.addListener(listener);
-    }*/
-
-    //connected to cast device
-    if (currentCastState.value == CastState.CONNECTED)*/
-    _currentAdapter.castUrl(url);
+    switch (currentCastState.state) {
+      case CastState.DISCONNECTED:
+        //TODO improve error handling
+        throw ('Not connected to a device!');
+      case CastState.CONNECTING:
+        //TODO improve error handling
+        throw ('Audio_cast is connecting. Please await api functions');
+        break;
+      case CastState.CONNECTED:
+        _currentAdapter.castUrl(url);
+        break;
+    }
   }
 
   static Future<void> disconnect() async {
+    if (currentCastState.state == CastState.DISCONNECTED &&
+        _currentPlaybackDevice == null) {
+      return;
+    }
+
+    if (currentCastState.state == CastState.CONNECTING) {
+      //TODO improve error handling
+      throw ('Audio_cast is connecting. Please await api functions');
+    }
+
     await _currentAdapter.disconnect();
     _currentPlaybackDevice = null;
-    /* //Connected to a cast device
-    if (currentCastState.value != CastState.DISCONNECTED)
-      await adapters[currentPlaybackDevice.value.adapterId].disconnect();*/
+    currentCastState.setState(CastState.DISCONNECTED);
   }
 
   static Future<void> play() async {
     if (_currentPlaybackState.state == PlaybackState.PLAYING) {
-      //throw ('Already playing');
-      return;
+      //TODO improve error handling
+      throw ('Already playing');
     }
-    if (await _currentAdapter.play()) {
+    try {
+      await _currentAdapter.play();
+
       _currentPlaybackState.setState(PlaybackState.PLAYING);
+    } catch (e) {
+      _currentPlaybackState.setState(PlaybackState.NO_AUDIO);
+      //TODO improve error handling
+      rethrow;
     }
   }
 
   static Future<void> pause() async {
-    if (_currentPlaybackState.state == PlaybackState.PAUSED) {
-      throw ('Already paused');
+    if (_currentPlaybackState.state != PlaybackState.PLAYING) {
+      //TODO improve error handling
+      throw ('Audio not playing');
     }
-    if (await _currentAdapter.pause()) {
+    try {
+      await _currentAdapter.pause();
+
       _currentPlaybackState.setState(PlaybackState.PAUSED);
+    } catch (e) {
+      //TODO improve error handling
+      rethrow;
     }
   }
 
@@ -107,25 +138,20 @@ class AudioCast {
   static Future<void> lowerVolume() async {
     try {
       await _currentAdapter.lowerVolume();
-    } catch (_) {}
+    } catch (e) {
+      //TODO improve error handling
+      print(e);
+    }
   }
 
   static Future<void> increaseVolume() async {
     try {
       await _currentAdapter.increaseVolume();
-    } catch (_) {}
+    } catch (e) {
+      //TODO improve error handling
+      print(e);
+    }
   }
-
-  /*static void updateMediaState(
-      {MediaStatus status, Device device, String audioUrl}) {
-    MediaState newMediaState = MediaState(
-      status ?? currentMediaState.value.status,
-      device ?? currentMediaState.value.device,
-      audioUrl ?? currentMediaState.value.audioUrl,
-    );
-
-    currentMediaState.value = newMediaState;
-  }*/
 
   static CastAdapter get _currentAdapter =>
       adapters[_currentPlaybackDevice.adapterId];

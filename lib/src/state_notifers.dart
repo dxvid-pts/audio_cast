@@ -19,3 +19,9 @@ class CurrentPlaybackStateNotifier extends StateNotifier<PlaybackState> {
 
   void setState(PlaybackState playbackState) => state = playbackState;
 }
+
+class CurrentCastStateNotifier extends StateNotifier<CastState> {
+  CurrentCastStateNotifier() : super(CastState.DISCONNECTED);
+
+  void setState(CastState castState) => state = castState;
+}

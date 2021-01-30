@@ -59,8 +59,7 @@ class UPnPAdapter extends CastAdapter {
         .actionNames
         .toString());
 
-    //TODO: super ->
-    //  ac.AudioCastEngine.currentPlaybackDevice.value = device;
+    return super.connect(device);
     // ac.AudioCastEngine.currentCastState.value = CastState.CONNECTED;
   }
 
@@ -108,34 +107,20 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  Future<bool> play() async {
-    try {
+  Future<void> play() async {
       await (await currentDevice
               .getService('urn:upnp-org:serviceId:AVTransport'))
           .playCurrentMedia();
-    } catch (_) {
-      return false;
-    }
-
-    return true;
   }
 
   @override
-  Future<bool> pause() async {
+  Future<void> pause() async {
     //SetPlayMode
-    print("a");
-    try {
       var res = await (await currentDevice
               .getService('urn:upnp-org:serviceId:AVTransport'))
           .pauseCurrentMedia();
 
       print(res.toString());
-    } catch (e) {
-      print('error: $e');
-      return false;
-    }
-    print("success");
-    return true;
   }
 
   @override
