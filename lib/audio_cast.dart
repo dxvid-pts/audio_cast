@@ -76,6 +76,8 @@ class AudioCast {
   }
 
   static Future<void> disconnect() async {
+    await _currentAdapter.disconnect();
+    _currentPlaybackDevice = null;
     /* //Connected to a cast device
     if (currentCastState.value != CastState.DISCONNECTED)
       await adapters[currentPlaybackDevice.value.adapterId].disconnect();*/
@@ -95,16 +97,24 @@ class AudioCast {
     if (_currentPlaybackState.state == PlaybackState.PAUSED) {
       throw ('Already paused');
     }
-    if (await _currentAdapter.play()) {
+    if (await _currentAdapter.pause()) {
       _currentPlaybackState.setState(PlaybackState.PAUSED);
     }
   }
 
   static Future<void> seek() async {}
 
-  static Future<void> lowerVolume() async {}
+  static Future<void> lowerVolume() async {
+    try {
+      await _currentAdapter.lowerVolume();
+    } catch (_) {}
+  }
 
-  static Future<void> increaseVolume() async {}
+  static Future<void> increaseVolume() async {
+    try {
+      await _currentAdapter.increaseVolume();
+    } catch (_) {}
+  }
 
   /*static void updateMediaState(
       {MediaStatus status, Device device, String audioUrl}) {

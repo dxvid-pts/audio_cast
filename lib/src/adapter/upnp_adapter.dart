@@ -12,6 +12,8 @@ import 'package:audio_cast/audio_cast.dart';
 
 import 'adapter.dart';
 
+typedef SetVolumeFunc = int Function(int volume);
+
 class UPnPAdapter extends CastAdapter {
   Future<String> ipFuture;
   Map<String, upnp.Device> upnpDevices = {};
@@ -53,6 +55,9 @@ class UPnPAdapter extends CastAdapter {
   @override
   Future<void> connect(Device device) async {
     currentDevice = upnpDevices[device.host];
+    print((await currentDevice.getService('urn:upnp-org:serviceId:AVTransport'))
+        .actionNames
+        .toString());
 
     //TODO: super ->
     //  ac.AudioCastEngine.currentPlaybackDevice.value = device;
@@ -88,6 +93,21 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
+  Future<void> disconnect() async {
+    try {
+      var res = await (await currentDevice
+              .getService('urn:upnp-org:serviceId:AVTransport'))
+          .stopCurrentMedia();
+
+      print(res.toString());
+    } catch (_) {
+      return false;
+    }
+
+    return super.disconnect();
+  }
+
+  @override
   Future<bool> play() async {
     try {
       await (await currentDevice
@@ -102,15 +122,44 @@ class UPnPAdapter extends CastAdapter {
 
   @override
   Future<bool> pause() async {
+    //SetPlayMode
+    print("a");
     try {
-      await (await currentDevice
+      var res = await (await currentDevice
               .getService('urn:upnp-org:serviceId:AVTransport'))
           .pauseCurrentMedia();
-    } catch (_) {
+
+      print(res.toString());
+    } catch (e) {
+      print('error: $e');
       return false;
     }
-
+    print("success");
     return true;
+  }
+
+  @override
+  Future<void> lowerVolume() async => await _setVolume((volume) => volume - 1);
+
+  @override
+  Future<void> increaseVolume() async =>
+      await _setVolume((volume) => volume + 1);
+
+  Future<void> _setVolume(SetVolumeFunc func) async {
+    var service = await currentDevice
+        .getService('urn:upnp-org:serviceId:RenderingControl');
+
+    var res = await service
+        .invokeAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
+    print(res['CurrentVolume']);
+
+    var volume = int.parse(res['CurrentVolume']);
+    volume = func(volume);
+    print(volume);
+
+    res = await service.invokeAction('SetVolume',
+        {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
+    print(res);
   }
 
   void _startServer(File file) async {
@@ -120,6 +169,8 @@ class UPnPAdapter extends CastAdapter {
         vd.jailRoot = false;
         server.listen((request) {
           print('new request: ' + request.connectionInfo.remoteAddress.host);
+          print(request.headers.toString());
+          print(request.response.toString());
           vd.serveFile(file, request);
         });
       }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
@@ -163,9 +214,8 @@ extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> playCurrentMedia({String Speed}) =>
       invokeAction('Play', {'InstanceID': '0', 'Speed': Speed ?? '1'});
 
-  Future<Map<String, dynamic>> stopCurrentMedia() => invokeAction('Stop', {
-        'InstanceID': '0',
-      });
+  Future<Map<String, dynamic>> stopCurrentMedia() =>
+      invokeAction('Stop', {'InstanceID': '0'});
 
   Future<Map<String, dynamic>> getPositionInfo() =>
       invokeAction('GetPositionInfo', {'InstanceID': '0'});
