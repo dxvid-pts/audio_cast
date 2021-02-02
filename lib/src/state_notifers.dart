@@ -17,7 +17,7 @@ class CurrentDeviceNotifier extends StateNotifier<Device> {
 class CurrentPlaybackStateNotifier extends StateNotifier<PlaybackState> {
   CurrentPlaybackStateNotifier() : super(PlaybackState.NO_AUDIO);
 
-  void setState(PlaybackState playbackState) => state = playbackState;
+  void setPlaybackState(PlaybackState playbackState) => state = playbackState;
 }
 
 class CurrentCastStateNotifier extends StateNotifier<CastState> {

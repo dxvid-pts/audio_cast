@@ -82,8 +82,6 @@ class UPnPAdapter extends CastAdapter {
         var result =
             await service.setCurrentURI('http://${await ipFuture}:8888');
         print(result);
-        result = await service.playCurrentMedia();
-        print(result);
       }
     } catch (e, stack) {
       print('error');
@@ -108,19 +106,18 @@ class UPnPAdapter extends CastAdapter {
 
   @override
   Future<void> play() async {
-      await (await currentDevice
-              .getService('urn:upnp-org:serviceId:AVTransport'))
-          .playCurrentMedia();
+    await (await currentDevice.getService('urn:upnp-org:serviceId:AVTransport'))
+        .playCurrentMedia();
   }
 
   @override
   Future<void> pause() async {
     //SetPlayMode
-      var res = await (await currentDevice
-              .getService('urn:upnp-org:serviceId:AVTransport'))
-          .pauseCurrentMedia();
+    var res = await (await currentDevice
+            .getService('urn:upnp-org:serviceId:AVTransport'))
+        .pauseCurrentMedia();
 
-      print(res.toString());
+    print(res.toString());
   }
 
   @override
@@ -129,6 +126,17 @@ class UPnPAdapter extends CastAdapter {
   @override
   Future<void> increaseVolume() async =>
       await _setVolume((volume) => volume + 1);
+
+  @override
+  Future<void> seek() async {
+    var res = await (await currentDevice
+            .getService('urn:upnp-org:serviceId:AVTransport'))
+        .getPositionInfo();
+    print(res);
+
+    await (await currentDevice.getService('urn:upnp-org:serviceId:AVTransport'))
+        .seek(Duration(seconds: 10));
+  }
 
   Future<void> _setVolume(SetVolumeFunc func) async {
     var service = await currentDevice
@@ -202,6 +210,20 @@ extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> stopCurrentMedia() =>
       invokeAction('Stop', {'InstanceID': '0'});
 
+  Future<Map<String, dynamic>> seek(Duration position) {
+    var target =
+        '${_timeString(position.inHours)}:${_timeString(position.inMinutes)}:${_timeString(position.inSeconds)}';
+    print(target);
+    invokeAction('Seek',
+        {'InstanceID': '0', 'Unit': 'ABS_COUNT', 'Target': 6000});
+  }
+
   Future<Map<String, dynamic>> getPositionInfo() =>
       invokeAction('GetPositionInfo', {'InstanceID': '0'});
 }
+
+String _timeString(int i) => i == null
+    ? '00'
+    : i < 10
+        ? '0$i'
+        : '$i';

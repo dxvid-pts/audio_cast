@@ -18,37 +18,8 @@ void main() {
       await Future.delayed(Duration(seconds: 10));
       print("play");
       await AudioCast.play();*/
-      await Future.delayed(Duration(seconds: 10));
-      print("lower");
-      await AudioCast.lowerVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.lowerVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.lowerVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.lowerVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.increaseVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.increaseVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.increaseVolume();
-
-      await Future.delayed(Duration(seconds: 3));
-      print("lower");
-      await AudioCast.increaseVolume();
+      await Future.delayed(Duration(seconds: 5));
+      await AudioCast.seek();
 
       await Future.delayed(Duration(seconds: 13));
       print("stop");
@@ -59,6 +30,6 @@ void main() {
     print('New playbackState: ' + s.toString());
   });
 
-  AudioCast.startDiscovery();
+  AudioCast.initialize();
   //AudioCast.connectToDevice(device);
 }

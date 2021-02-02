@@ -14,8 +14,9 @@ final CurrentCastStateNotifier currentCastState = CurrentCastStateNotifier();
 
 class AudioCast {
   static Device _currentPlaybackDevice;
+  static final Set<Function> listeners = {};
 
-  static void startDiscovery() async {
+  static void initialize() async {
     if (_engineInitiated) return;
     _engineInitiated = true;
 
@@ -30,19 +31,31 @@ class AudioCast {
       print("Add listner");
 
       //TODO: Add listener to map to dispose
-      adapter.devices.addListener((_) {
-        print("listener: has changed");
+      listeners.add(adapter.devices.addListener((_) {
+        print('listener: has changed');
         _refreshDeviceList();
-      });
+      }));
     });
   }
 
-  static Future<void> connectToDevice(Device device) async {
-    currentCastState.setState(CastState.CONNECTING);
+  static Future<void> shutdown() async {
+    print("rem. losten");
+    if (currentCastState.state == CastState.CONNECTED) {
+      await disconnect();
+    }
 
+    //remove listeners
+    listeners.forEach((removeListener) => removeListener());
+    listeners.clear();
+
+    _engineInitiated = false;
+  }
+
+  static Future<void> connectToDevice(Device device) async {
     try {
       //not connecte to a cast device
       if (currentCastState.state == CastState.DISCONNECTED) {
+        currentCastState.setState(CastState.CONNECTING);
         await adapters[device.adapterId].connect(device);
       }
       //connected to a cast device
@@ -53,6 +66,7 @@ class AudioCast {
           await _currentAdapter.disconnect();
 
           //connect to new device
+          currentCastState.setState(CastState.CONNECTING);
           await adapters[device.adapterId].connect(device);
         }
       }
@@ -71,7 +85,7 @@ class AudioCast {
     }
   }
 
-  static void castAudioFromUrl(String url, {Duration start}) async {
+  static Future<void> castAudioFromUrl(String url, {Duration start}) async {
     switch (currentCastState.state) {
       case CastState.DISCONNECTED:
         //TODO improve error handling
@@ -81,7 +95,8 @@ class AudioCast {
         throw ('Audio_cast is connecting. Please await api functions');
         break;
       case CastState.CONNECTED:
-        _currentAdapter.castUrl(url);
+        await _currentAdapter.castUrl(url);
+        await play();
         break;
     }
   }
@@ -108,11 +123,14 @@ class AudioCast {
       throw ('Already playing');
     }
     try {
+      print("aaaa");
       await _currentAdapter.play();
+      print('plaing');
 
-      _currentPlaybackState.setState(PlaybackState.PLAYING);
+      _currentPlaybackState.setPlaybackState(PlaybackState.PLAYING);
     } catch (e) {
-      _currentPlaybackState.setState(PlaybackState.NO_AUDIO);
+      print('ölll');
+      _currentPlaybackState.setPlaybackState(PlaybackState.NO_AUDIO);
       //TODO improve error handling
       rethrow;
     }
@@ -126,14 +144,26 @@ class AudioCast {
     try {
       await _currentAdapter.pause();
 
-      _currentPlaybackState.setState(PlaybackState.PAUSED);
+      _currentPlaybackState.setPlaybackState(PlaybackState.PAUSED);
     } catch (e) {
       //TODO improve error handling
       rethrow;
     }
   }
 
-  static Future<void> seek() async {}
+  static Future<void> seek() async {
+    print(_currentPlaybackState.state.toString());
+    if (_currentPlaybackState.state == PlaybackState.NO_AUDIO) {
+      //TODO improve error handling
+      throw ('Not playing');
+    }
+    try {
+      await _currentAdapter.seek();
+    } catch (e) {
+      //TODO improve error handling
+      rethrow;
+    }
+  }
 
   static Future<void> lowerVolume() async {
     try {
