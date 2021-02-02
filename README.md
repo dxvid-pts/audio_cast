@@ -2,6 +2,12 @@
 
 A pure dart package for casting audio to streaming devices such as Hi-Fi systems and streaming sticks.
 
+### [Early Access]
+
+<span style="color:brown;">**This project is currently unpublished and in development.**</span></br>
+The API will change and add chromecast support in the first release
+
+### Usage
 ```dart
 AudioCast.initialize(); //start discovery
 
@@ -16,11 +22,7 @@ await AudioCast.pause(); //pause audio
 
 await AudioCast.disconnect(); //disconnect from connected device
 ```
-
-### [Early Access]
-
-<span style="color:brown;">**This project is currently unpublished and in development.**</span></br>
-The API will change and add chromecast support in the first release
+### Features
 
 | Feature                            | Android    | iOS     | Windows   | macOS     | Linux |
 | -------                            | :-------:  | :-----: | :-----: | :-----: | :-----: |
