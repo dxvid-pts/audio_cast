@@ -39,7 +39,6 @@ class AudioCast {
   }
 
   static Future<void> shutdown() async {
-    print("rem. losten");
     if (currentCastState.state == CastState.CONNECTED) {
       await disconnect();
     }
@@ -123,13 +122,10 @@ class AudioCast {
       throw ('Already playing');
     }
     try {
-      print("aaaa");
       await _currentAdapter.play();
-      print('plaing');
 
       _currentPlaybackState.setPlaybackState(PlaybackState.PLAYING);
     } catch (e) {
-      print('ölll');
       _currentPlaybackState.setPlaybackState(PlaybackState.NO_AUDIO);
       //TODO improve error handling
       rethrow;
@@ -201,55 +197,6 @@ class AudioCast {
       _currentPlaybackState.stream;
 }
 
-/*
-class AudioCast {
-  ///initialize engine
-  AudioCast() {
-    AudioCastEngine.initialize();
-  }
-
-  ValueNotifier<Set<Device>> get devices => AudioCastEngine.devices;
-
-  static Future<void> connectToDevice(Device device) =>
-      AudioCastEngine.connectToDevice(device);
-
-  static void castAudioFromUrl(String url) =>
-      AudioCastEngine.castAudioFromUrl(url);
-
-  static void disconnect() => AudioCastEngine.disconnect();
-
-  static const MethodChannel _channel = const MethodChannel('audio_cast');
-
-  Set<ValueNotifier<Set<Device>>> get valueNotifierDeviceList =>
-      adapters.map((adapter) => adapter.devices).toSet();
-
-  //Change to valueNotifier
-  ValueNotifier<Set<Device>> listDevices() {
-    /* Set<Stream<Set<Device>>> streams = {};
-
-    adapters.forEach((adapter) {
-      streams.add(adapter.listDevices());
-    });
-
-    return StreamGroup.merge(streams);*/
-  }
-
-  void showDeviceDialog(BuildContext context,
-      {OnDeviceSelected onDeviceSelected}) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Row(
-          children: [Icon(Icons.cast), SizedBox(width: 16), Text('Cast to')],
-        ),
-        content: CastDeviceList(onDeviceSelected: onDeviceSelected),
-        contentPadding:
-        const EdgeInsets.only(left: 15, top: 20, right: 15, bottom: 15),
-      ),
-    );
-  }
-}
-*/
 class Device {
   final String host, name;
   final int port, adapterId;
@@ -259,10 +206,3 @@ class Device {
   const Device(this.host, this.name, this.port, this.type, this.adapterId,
       {this.params});
 }
-
-/*
- static Future<String> get platformVersion async {
-    final String version = await _channel.invokeMethod('getPlatformVersion');
-    return version;
-  }
- */
