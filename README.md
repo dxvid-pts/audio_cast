@@ -1,17 +1,26 @@
 # audio_cast
 
-Audio cast plugin
+A pure dart package for casting audio to streaming devices such as Hi-Fi systems and streaming sticks.
 
-## Getting Started
+```dart
+AudioCast.initialize(); //start discovery
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/developing-packages/),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+AudioCast.deviceStream.listen((devices){}) //listen for devices
 
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+await AudioCast.connectToDevice(device); //connect to a device
+
+await AudioCast.castAudioFromUrl(
+'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'); //cast audio
+
+await AudioCast.pause(); //pause audio
+
+await AudioCast.disconnect(); //disconnect from connected device
+```
+
+### [Early Access]
+
+<span style="color:brown;">**This project is currently unpublished and in development.**</span></br>
+The API will change and add chromecast support in the first release
 
 | Feature                            | Android    | iOS     | Windows   | macOS     | Linux |
 | -------                            | :-------:  | :-----: | :-----: | :-----: | :-----: |
