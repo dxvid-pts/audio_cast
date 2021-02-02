@@ -4,7 +4,7 @@ A pure dart package for casting audio to streaming devices such as Hi-Fi systems
 
 ### [Early Access]
 
-<a><img src="https://github.com/peterscodee/audio_cast/blob/master/coloredtext.svg"/></a></br>
+>> **This project is unpublished and under development**</br>
 The API will change and add chromecast support in the first release
 
 ### Usage
