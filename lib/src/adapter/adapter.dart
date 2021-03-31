@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:audio_cast/audio_cast.dart';
 import 'package:audio_cast/src/state_notifers.dart';
 
@@ -10,7 +12,7 @@ final List<CastAdapter> adapters = [
 ];
 
 abstract class CastAdapter {
-  DeviceListNotifier devices = DeviceListNotifier();
+  final DeviceListNotifier devices = DeviceListNotifier();
 
   void initialize() {}
 
@@ -18,17 +20,21 @@ abstract class CastAdapter {
 
   Future<void> connect(Device device) async {}
 
-  void castUrl(String url) {}
+  void castUrl(String url, MediaData mediaData, Duration start) {}
+
+  void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
 
   Future<void> disconnect() async {}
 
-  Future<void> play() async => true;
+  Future<void> play() async {}
 
-  Future<void> pause() async => true;
+  Future<void> pause() async {}
 
-  Future<void> seek() async => true;
+  Future<void> setPosition(Duration position) async {}
 
-  Future<void> lowerVolume() async {}
+  Future<Duration> getPosition() async => null;
 
-  Future<void> increaseVolume() async {}
+  Future<void> setVolume(int volume) async {}
+
+  Future<int> getVolume() async => null;
 }

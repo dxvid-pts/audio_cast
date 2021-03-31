@@ -1,6 +1,6 @@
 name: audio_cast
-description: A starting point for Dart libraries or applications.
-# version: 1.0.0
+description: A package for casting audio to streaming devices such as Hi-Fi systems and streaming sticks, written in pure Dart.
+version: 0.0.1
 homepage: https://www.peterscode.dev
 
 environment:
@@ -9,9 +9,10 @@ environment:
 dependencies:
   state_notifier: ^0.6.0
 
-  #DLNA
   http: ^0.12.2
   http_server: ^0.9.8+3
+  mp3_info: ^0.1.4
+  #upnp: ^2.0.1
   upnp:
     git: https://github.com/peterscodee/upnp_dart.git
 

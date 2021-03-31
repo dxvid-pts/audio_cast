@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:audio_cast/src/utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:file/memory.dart';
 import 'package:http_server/http_server.dart';
+import 'package:mp3_info/mp3_info.dart';
 import 'package:upnp/upnp.dart' as upnp;
 import 'package:xml/xml.dart';
-import 'dart:convert' show HtmlEscape, HtmlEscapeMode, htmlEscape;
+import 'dart:convert' show htmlEscape;
 
 import 'package:audio_cast/audio_cast.dart';
 
@@ -18,6 +20,8 @@ class UPnPAdapter extends CastAdapter {
   Future<String> ipFuture;
   Map<String, upnp.Device> upnpDevices = {};
   upnp.Device currentDevice;
+
+  Future<upnp.Service> get service => currentDevice.getService('urn:upnp-org:serviceId:AVTransport');
 
   @override
   void initialize() async {
@@ -44,10 +48,9 @@ class UPnPAdapter extends CastAdapter {
                 upnpDevice.url, upnpDevice.friendlyName, 0, CastType.DLNA, 0))
             .toSet());
 
-        print('Device added: ');
-      } catch (e, stack) {
-        print('ERROR: ${e} - ${client.location}');
-        print(stack);
+      } catch (e) {
+        errorDebugPrint('initialize()', e);
+        if (!flagCatchErrors) rethrow;
       }
     });
   }
@@ -55,115 +58,95 @@ class UPnPAdapter extends CastAdapter {
   @override
   Future<void> connect(Device device) async {
     currentDevice = upnpDevices[device.host];
-    print((await currentDevice.getService('urn:upnp-org:serviceId:AVTransport'))
-        .actionNames
-        .toString());
 
-    return super.connect(device);
-    // ac.AudioCastEngine.currentCastState.value = CastState.CONNECTED;
+    /*print((await service).actionNames.toString());
+    return super.connect(device);*/
   }
 
   @override
-  void castUrl(String url) async {
-    print('Downloading audio...');
-    File file = MemoryFileSystem().file('audio.mp3');
-    var res = await http.get(url);
-    file.writeAsBytesSync(res.bodyBytes);
-    print('Downloaded audio');
+  void castUrl(String url, MediaData mediaData, Duration start) async {
+    debugPrint('Downloading audio...');
+    var bytes = (await http.get(url)).bodyBytes;
+    debugPrint('Downloaded audio');
 
-    _startServer(file);
+    castBytes(bytes, mediaData, start);
+  }
 
+  @override
+  void castBytes(Uint8List bytes, MediaData mediaData, Duration start) async {
     try {
-      if (currentDevice.serviceNames
-          .contains('urn:upnp-org:serviceId:AVTransport')) {
-        var service = await currentDevice
-            .getService('urn:upnp-org:serviceId:AVTransport');
+      if (start != null) {
+        var mp3 = MP3Processor.fromBytes(bytes);
 
-        var result =
-            await service.setCurrentURI('http://${await ipFuture}:8888');
-        print(result);
+        bytes = cutMp3(bytes, start, mp3.bitrate, mp3.duration);
       }
-    } catch (e, stack) {
-      print('error');
-      print(stack);
+
+      _startServer(MemoryFileSystem().file('audio.mp3')..writeAsBytesSync(bytes));
+
+      var result = await (await service).setCurrentURI('http://${await ipFuture}:8888', mediaData);
+
+      if (result.isNotEmpty) debugPrint(result.toString());
+    } catch (e) {
+      errorDebugPrint('castBytes(bytes, start, mediaData)', e);
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   @override
-  Future<void> disconnect() async {
+  Future<void> disconnect() async => (await service).stopCurrentMedia();
+
+  @override
+  Future<void> play() async => (await service).playCurrentMedia();
+
+  @override
+  Future<void> pause() async => (await service).pauseCurrentMedia();
+
+  @override
+  //Specs: http://www.upnp.org/specs/av/UPnP-av-AVTransport-v3-Service-20101231.pdf (2.2.15)
+  Future<void> setPosition(Duration position) async => (await service).setPosition(position);
+
+  @override
+  Future<Duration> getPosition() async {
+    var res = await (await service).getPositionInfo();
+
+    var duration = _tryParsePosition('RelTime', res);
+    duration ??= _tryParsePosition('AbsTime', res);
+
+    return duration;
+  }
+
+  Duration _tryParsePosition(String key, Map<String, String> res) {
     try {
-      var res = await (await currentDevice
-              .getService('urn:upnp-org:serviceId:AVTransport'))
-          .stopCurrentMedia();
+      final currentRelTime = res[key].toString().split(':');
 
-      print(res.toString());
-    } catch (_) {
-      return false;
-    }
+      if (currentRelTime.length == 3) {
+        final hours = int.tryParse(currentRelTime[0]),
+            mins = int.tryParse(currentRelTime[1]),
+            secs = int.tryParse(currentRelTime[2]);
 
-    return super.disconnect();
+        if (hours != null && mins != null && secs != null) {
+          return Duration(hours: hours, minutes: mins, seconds: secs);
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
-  Future<void> play() async {
-    await (await currentDevice.getService('urn:upnp-org:serviceId:AVTransport'))
-        .playCurrentMedia();
-  }
+  Future<int> getVolume() async => int.parse((await (await service).getVolume())['CurrentVolume']);
 
   @override
-  Future<void> pause() async {
-    //SetPlayMode
-    var res = await (await currentDevice
-            .getService('urn:upnp-org:serviceId:AVTransport'))
-        .pauseCurrentMedia();
+  Future<void> setVolume(int volume) async => (await service).setVolume(volume);
 
-    print(res.toString());
-  }
-
-  @override
-  Future<void> lowerVolume() async => await _setVolume((volume) => volume - 1);
-
-  @override
-  Future<void> increaseVolume() async =>
-      await _setVolume((volume) => volume + 1);
-
-  @override
-  Future<void> seek() async {
-    var res = await (await currentDevice
-            .getService('urn:upnp-org:serviceId:AVTransport'))
-        .getPositionInfo();
-    print(res);
-
-    await (await currentDevice.getService('urn:upnp-org:serviceId:AVTransport'))
-        .seek(Duration(seconds: 10));
-  }
-
-  Future<void> _setVolume(SetVolumeFunc func) async {
-    var service = await currentDevice
-        .getService('urn:upnp-org:serviceId:RenderingControl');
-
-    var res = await service
-        .invokeAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
-    print(res['CurrentVolume']);
-
-    var volume = int.parse(res['CurrentVolume']);
-    volume = func(volume);
-    print(volume);
-
-    res = await service.invokeAction('SetVolume',
-        {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
-    print(res);
-  }
-
-  void _startServer(File file) async {
+  void _startServer(File file) {
+    //TODO: dispose server on disconnect;
+    //TODO: find free port / autogenerate
     runZoned(() {
       HttpServer.bind(InternetAddress.anyIPv4, 8888).then((HttpServer server) {
         var vd = VirtualDirectory('.');
         vd.jailRoot = false;
         server.listen((request) {
-          print('new request: ' + request.connectionInfo.remoteAddress.host);
-          print(request.headers.toString());
-          print(request.response.toString());
+          debugPrint('new request: ' + request.connectionInfo.remoteAddress.host);
           vd.serveFile(file, request);
         });
       }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
@@ -184,8 +167,7 @@ class UPnPAdapter extends CastAdapter {
 }
 
 extension ServiceActions on upnp.Service {
-  Future<Map<String, dynamic>> setCurrentURI(String url,
-          {String title, artist}) =>
+  Future<Map<String, dynamic>> setCurrentURI(String url, MediaData mediaData) =>
       invokeAction('SetAVTransportURI', {
         'InstanceID': '0',
         'CurrentURI': url,
@@ -193,37 +175,39 @@ extension ServiceActions on upnp.Service {
                 '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:sec="http://www.sec.co.kr/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
                 '<item id="0" parentID="-1" restricted="false">'
                 '<upnp:class>object.item.audioItem.musicTrack</upnp:class>'
-                '<dc:title>$title</dc:title>'
-                '<dc:creator>$artist</dc:creator>'
+                '<dc:title>${mediaData.title}</dc:title>'
+                '<dc:creator>${mediaData.artist}</dc:creator>'
+                '<upnp:artist>${mediaData.artist}</upnp:artist>'
+                '<upnp:album>${mediaData.album}</upnp:album>'
                 '<res protocolInfo="http-get:*:audio/mpeg:*">$url</res>'
                 '</item>'
                 '</DIDL-Lite>')
             .toString()))
       });
 
-  Future<Map<String, dynamic>> pauseCurrentMedia() =>
-      invokeAction('Pause', {'InstanceID': '0'});
+  Future<Map<String, dynamic>> pauseCurrentMedia() => invokeAction('Pause', {'InstanceID': '0'});
 
   Future<Map<String, dynamic>> playCurrentMedia({String Speed}) =>
       invokeAction('Play', {'InstanceID': '0', 'Speed': Speed ?? '1'});
 
-  Future<Map<String, dynamic>> stopCurrentMedia() =>
-      invokeAction('Stop', {'InstanceID': '0'});
+  Future<Map<String, dynamic>> stopCurrentMedia() => invokeAction('Stop', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> seek(Duration position) {
-    var target =
-        '${_timeString(position.inHours)}:${_timeString(position.inMinutes)}:${_timeString(position.inSeconds)}';
-    print(target);
-    invokeAction('Seek',
-        {'InstanceID': '0', 'Unit': 'ABS_COUNT', 'Target': 6000});
+  Future<Map<String, dynamic>> setVolume(int volume) =>
+      invokeAction('SetVolume', {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
+
+  Future<Map<String, dynamic>> getVolume() =>
+      invokeAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
+
+  Future<Map<String, dynamic>> setPosition(Duration position) {
+    final target =
+        '${_timeString(position.inHours)}:${_timeString(position.inMinutes - position.inHours * 60)}:'
+        '${_timeString(position.inSeconds - position.inMinutes * 60)}';
+
+    return invokeAction(
+        'Seek', {'InstanceID': '0', 'Unit': 'REL_TIME', 'Target': target});
   }
 
-  Future<Map<String, dynamic>> getPositionInfo() =>
-      invokeAction('GetPositionInfo', {'InstanceID': '0'});
+  Future<Map<String, dynamic>> getPositionInfo() => invokeAction('GetPositionInfo', {'InstanceID': '0'});
 }
 
-String _timeString(int i) => i == null
-    ? '00'
-    : i < 10
-        ? '0$i'
-        : '$i';
+String _timeString(int i) => i == null ? '00' : i < 10 ? '0$i' : '$i';
