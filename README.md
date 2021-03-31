@@ -1,11 +1,10 @@
 # audio_cast
 
-A pure dart package for casting audio to streaming devices such as Hi-Fi systems and streaming sticks.
+A pure Dart audio casting library.
 </br></br>
 
-> ### [Early Access]
-> ### **This project is unpublished and under development**
-> The API will change and add chromecast support in the initial release
+> ### [Developer Preview]
+> **This project is under active development.** Features might not work as expected. Chromecast and airplay support will be added in the future.
 
 ### Usage
 ```dart
@@ -15,8 +14,7 @@ AudioCast.deviceStream.listen((devices){}) //listen for devices
 
 await AudioCast.connectToDevice(device); //connect to a device
 
-await AudioCast.castAudioFromUrl(
-'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'); //cast audio
+await AudioCast.castAudioFromUrl('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'); //cast audio
 
 await AudioCast.pause(); //pause audio
 
@@ -28,5 +26,5 @@ await AudioCast.disconnect(); //disconnect from connected device
 | -------                            | :-------:  | :-----: | :-----: | :-----: | :-----: |
 | Chromecast                         |          |         |       |       |      |
 | Airplay                            |          |           |       |       |      |
-| DLNA                               | ✅        | ✅        | ✅      |     ✅  |   ✅   |
+| DLNA / UPnP                               | ✅        | ✅        | ✅      |     ✅  |   ✅   |
 | FireTV                             |          |           |       |       |      |
