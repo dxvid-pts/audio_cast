@@ -4,7 +4,7 @@ description: A starting point for Dart libraries or applications.
 homepage: https://www.peterscode.dev
 
 environment:
-  sdk: '>=2.10.0 <2.12.0'
+  sdk: '>=2.10.0 <3.0.0'
 
 dependencies:
   state_notifier: ^0.6.0
@@ -12,14 +12,8 @@ dependencies:
   #DLNA
   http: ^0.12.2
   http_server: ^0.9.8+3
-  file: ^5.2.1
-  mp3_info: ^0.1.4
-  #upnp: ^2.0.1
-  #upnp:
-  #  git: https://github.com/moda20/upnp.dart.git
   upnp:
     git: https://github.com/peterscodee/upnp_dart.git
-    #path: C:\Users\David\IdeaProjects\upnp_dart
 
 dev_dependencies:
   pedantic: ^1.9.0
