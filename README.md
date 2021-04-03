@@ -1,4 +1,4 @@
-# audio_cast
+[![Pub](https://img.shields.io/pub/v/audio_cast?color=2196F3)](https://pub.dev/packages/audio_cast)
 
 A package for casting audio to streaming devices such as Hi-Fi systems and streaming sticks, written in pure Dart.
 </br></br>
@@ -6,7 +6,7 @@ A package for casting audio to streaming devices such as Hi-Fi systems and strea
 > ### [Developer Preview]
 > **This project is under active development.** Features might not work as expected. Chromecast and Airplay support will be added in the future.
 
-### Usage
+## Usage
 ```dart
 AudioCast.initialize(); //start discovery
 
@@ -45,7 +45,7 @@ await AudioCast.disconnect(); //disconnect from the connected device
 
 AudioCast.shutdown(); //stop device discovery
 ```
-### Features
+## Features
 
 | Feature                            | Android    | iOS     | Windows   | macOS     | Linux |
 | -------                            | :-------:  | :-----: | :-----: | :-----: | :-----: |
