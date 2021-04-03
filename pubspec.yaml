@@ -12,9 +12,10 @@ dependencies:
   http: ^0.12.2
   http_server: ^0.9.8+3
   mp3_info: ^0.1.4
-  #upnp: ^2.0.1
-  upnp:
-    git: https://github.com/peterscodee/upnp_dart.git
+  upnp: ^2.0.1
+  dart_chromecast: ^0.2.4
+  #upnp:
+  #  git: https://github.com/peterscodee/upnp_dart.git
 
 dev_dependencies:
   pedantic: ^1.9.0

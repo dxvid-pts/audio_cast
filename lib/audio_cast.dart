@@ -278,6 +278,21 @@ class Device {
   final int port, adapterId;
   final CastType type;
   final Map<String, String> params;
+
+  @override
+  String toString() => 'Device($name, $host:$port, ${type.toString()})';
+
+  @override
+  bool operator==(other) {
+    if(other is! Device) {
+      return false;
+    }
+
+    return toString() == (other as Device).toString();
+  }
+
+  @override
+  int get hashCode => toString().hashCode;
 }
 
 class MediaData {

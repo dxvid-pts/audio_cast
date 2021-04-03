@@ -3,11 +3,12 @@ import 'dart:typed_data';
 import 'package:audio_cast/audio_cast.dart';
 import 'package:audio_cast/src/state_notifers.dart';
 
+import 'chromecast_adapter.dart';
 import 'upnp_adapter.dart';
 
 final List<CastAdapter> adapters = [
   UPnPAdapter(), //0
-  //ChromeCastMobileAdapter(), //1
+  ChromeCastAdapter(), //1
   // AirplayMobileAdapter(), //2
 ];
 
