@@ -18,18 +18,19 @@ typedef SetVolumeFunc = int Function(int volume);
 
 class UPnPAdapter extends CastAdapter {
   Future<String> ipFuture;
-  Map<String, upnp.Device> upnpDevices = {};
+  final Map<String, upnp.Device> upnpDevices = {};
   upnp.Device currentDevice;
+  final disc = upnp.DeviceDiscoverer();
 
   Future<upnp.Service> get service => currentDevice.getService('urn:upnp-org:serviceId:AVTransport');
 
   @override
-  void initialize() async {
-    ipFuture = _getIp();
+  void initialize() async => ipFuture = _getIp();
 
-    var disc = upnp.DeviceDiscoverer();
+  @override
+  Future<void> performSingleDiscovery() async {
     await disc.start(ipv6: false);
-    disc.quickDiscoverClients().listen((client) async {
+    await for(var client in disc.quickDiscoverClients()) {
       try {
         var dev = await client.getDevice();
 
@@ -45,14 +46,22 @@ class UPnPAdapter extends CastAdapter {
 
         setDevices(upnpDevices.values
             .map((upnpDevice) => Device(
-                upnpDevice.url, upnpDevice.friendlyName, 0, CastType.DLNA, 0))
+            upnpDevice.url, upnpDevice.friendlyName, 0, CastType.DLNA, 0))
             .toSet());
 
+        disc.stop();
       } catch (e) {
-        errorDebugPrint('initialize()', e);
+        disc.stop();
+        errorDebugPrint('performSingleDiscovery()', e);
         if (!flagCatchErrors) rethrow;
       }
-    });
+    }
+  }
+
+  @override
+  void cancelDiscovery() {
+    super.cancelDiscovery();
+    disc.stop();
   }
 
   @override

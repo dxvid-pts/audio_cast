@@ -11,63 +11,84 @@ import 'adapter.dart';
 
 class ChromeCastAdapter extends CastAdapter {
 
-  @override
-  void initialize() async{
-    const name = '_googlecast._tcp';
+  final client = !Platform.isAndroid
+      ? MDnsClient()
+      : MDnsClient(rawDatagramSocketFactory: (dynamic host, int port,
+      {bool reuseAddress, bool reusePort, int ttl}) {
+    return RawDatagramSocket.bind(host, port,
+        reuseAddress: true, reusePort: false, ttl: ttl);
+  });
 
-    final client = !Platform.isAndroid
-        ? MDnsClient()
-        : MDnsClient(rawDatagramSocketFactory: (dynamic host, int port,
-            {bool reuseAddress, bool reusePort, int ttl}) {
-            return RawDatagramSocket.bind(host, port,
-                reuseAddress: true, reusePort: false, ttl: ttl);
+  @override
+  Future<void> performSingleDiscovery() async{
+    try{
+      const service = '_googlecast._tcp';
+
+      final devices = <Device>{};
+      // Start the client with default options.
+      await client.start();
+      // Get the PTR record for the service.
+      await for (final PtrResourceRecord ptr in client
+          .lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer(service))) {
+
+        await for (final SrvResourceRecord srv in client.lookup<SrvResourceRecord>(
+            ResourceRecordQuery.service(ptr.domainName))) {
+
+          String chromecastName;
+          await client
+              .lookup<TxtResourceRecord>(ResourceRecordQuery.text(ptr.domainName))
+              .forEach((re){
+            chromecastName = re.text.split('fn=')[1].split('\n')[0];
           });
 
-    final devices = <Device>{};
-    // Start the client with default options.
-    await client.start();
-    // Get the PTR record for the service.
-    await for (final PtrResourceRecord ptr in client
-        .lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer(name))) {
-
-      await for (final SrvResourceRecord srv in client.lookup<SrvResourceRecord>(
-          ResourceRecordQuery.service(ptr.domainName))) {
-
-        String chromecastName;
-        await client
-            .lookup<TxtResourceRecord>(ResourceRecordQuery.text(ptr.domainName))
-            .forEach((re){
-              chromecastName = re.text.split('fn=')[1].split('\n')[0];
-        });
-
-        await for (final IPAddressResourceRecord ip
-        in client.lookup<IPAddressResourceRecord>(
-            ResourceRecordQuery.addressIPv4(srv.target))) {
+          await for (final IPAddressResourceRecord ip
+          in client.lookup<IPAddressResourceRecord>(
+              ResourceRecordQuery.addressIPv4(srv.target))) {
 
             debugPrint('Service instance $chromecastName found at ${ip.address.address}:${srv.port}.');
 
             devices.add(Device(ip.address.address, chromecastName, srv.port, CastType.CHROMECAST, 1));
             setDevices(devices);
-        }
-        /*await for (final IPAddressResourceRecord ip
+          }
+          /*await for (final IPAddressResourceRecord ip
         in client.lookup<IPAddressResourceRecord>(
             ResourceRecordQuery.addressIPv6(srv.target))) {
             print(ip);
           print('Service instance $chromecastName found at '
               '${ip.address.address}:${srv.port}.');
         }*/
+        }
+      }
+      client.stop();
+    }catch(e){
+      if(!e.toString().contains('mDNS client must be started before calling lookup')){
+        errorDebugPrint('performSingleDiscovery()', e);
+        if(!flagCatchErrors) rethrow;
       }
     }
-    client.stop();
+  }
 
-    print('Done.');
+  @override
+  void cancelDiscovery() {
+    super.cancelDiscovery();
+    client.stop();
   }
 
   @override
   Future<void> connect(Device device) async {}
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration start) {}
+  void castUrl(String url, MediaData mediaData, Duration start) {
+    /*
+    CastMedia(
+      title: 'Chromecast video 1',
+      contentId:
+          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      contentType: "audio/mp3",
+      images: ['https://picsum.photos/700'],
+    ),
+     */
+  }
 
   @override
   void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}

@@ -1,5 +1,7 @@
 library audio_cast;
 
+import 'dart:async';
+
 import 'package:audio_cast/src/adapter/adapter.dart';
 import 'package:audio_cast/src/state_notifers.dart';
 import 'package:audio_cast/src/utils.dart';
@@ -25,13 +27,19 @@ class AudioCast {
       //initialize adapters
       adapters.forEach((adapter) => adapter.initialize());
 
+      listeners.add(currentCastState.addListener((CastState castState){
+        if (castState == CastState.DISCONNECTED) {
+          adapters.forEach((adapter) => adapter.startDiscovery());
+        } else {
+          adapters.forEach((adapter) => adapter.cancelDiscovery());
+        }
+      }));
+
       //Add devices
       _refreshDeviceList();
 
       //Monitor listeners to refresh the device list
       adapters.forEach((adapter) {
-
-        //TODO: Add listener to map to dispose
         listeners.add(adapter.devices.addListener((_) =>  _refreshDeviceList()));
       });
     }catch(e){
@@ -44,6 +52,8 @@ class AudioCast {
     if (currentCastState.state == CastState.CONNECTED) {
       await disconnect();
     }
+
+    adapters.forEach((adapter) => adapter.cancelDiscovery());
 
     //remove listeners
     listeners.forEach((removeListener) => removeListener());
@@ -248,21 +258,12 @@ class AudioCast {
 
   static void _refreshDeviceList() {
     var newList = <Device>{};
-    adapters.forEach((adapter) {
-      newList.addAll(adapter.devices.state);
-    });
+    adapters.forEach((adapter) => newList.addAll(adapter.devices.state));
 
     _devices.setDevices(newList);
   }
 
-  static Stream<Set<Device>> get deviceStream async* {
-    _devices.stream;
-    while(_engineInitiated) {
-      await for(var list in _devices.stream) {
-        yield list;
-      }
-    }
-  }
+  static Stream<Set<Device>> get deviceStream => _devices.stream;
 
   static Stream<PlaybackState> get playbackStateStream =>
       _currentPlaybackState.stream;
