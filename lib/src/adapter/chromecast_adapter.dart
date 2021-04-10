@@ -13,11 +13,8 @@ class ChromeCastAdapter extends CastAdapter {
 
   final client = !Platform.isAndroid
       ? MDnsClient()
-      : MDnsClient(rawDatagramSocketFactory: (dynamic host, int port,
-      {bool reuseAddress, bool reusePort, int ttl}) {
-    return RawDatagramSocket.bind(host, port,
-        reuseAddress: true, reusePort: false, ttl: ttl);
-  });
+      : MDnsClient(rawDatagramSocketFactory: (dynamic host, int port, {bool reuseAddress, bool reusePort, int ttl}) =>
+              RawDatagramSocket.bind(host, port, reuseAddress: true, reusePort: false, ttl: ttl));
 
   @override
   Future<void> performSingleDiscovery() async{

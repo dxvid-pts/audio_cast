@@ -1,7 +1,8 @@
 name: audio_cast
 description: A package for casting audio to streaming devices such as Hi-Fi systems and streaming sticks, written in pure Dart.
-version: 0.0.1
+version: 0.0.1+1
 homepage: https://www.peterscode.dev
+repository: https://github.com/peterscodee/audio_cast
 
 environment:
   sdk: '>=2.10.0 <3.0.0'
@@ -13,7 +14,7 @@ dependencies:
   http_server: ^0.9.8+3
   mp3_info: ^0.1.4
   upnp: ^2.0.1
-  dart_chromecast: ^0.2.4
+  #dart_chromecast: ^0.2.4
   multicast_dns: ^0.2.2
   xml: '>=4.0.0 <5.0.0'
   file: '>=5.0.0 <6.0.0'
