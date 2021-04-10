@@ -1,32 +1,37 @@
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_cast/audio_cast.dart';
+import 'package:dart_chromecast/casting/cast_device.dart';
+import 'package:dart_chromecast/casting/cast_media.dart';
+import 'package:dart_chromecast/casting/cast_sender.dart';
 
 import 'package:multicast_dns/multicast_dns.dart';
 
 import '../utils.dart';
 import 'adapter.dart';
 
-class ChromeCastAdapter extends CastAdapter {
+const _service = '_googlecast._tcp';
 
+class ChromeCastAdapter extends CastAdapter {
   final client = !Platform.isAndroid
       ? MDnsClient()
       : MDnsClient(rawDatagramSocketFactory: (dynamic host, int port, {bool reuseAddress, bool reusePort, int ttl}) =>
               RawDatagramSocket.bind(host, port, reuseAddress: true, reusePort: false, ttl: ttl));
 
+  CastSender _sender;
+
   @override
   Future<void> performSingleDiscovery() async{
     try{
-      const service = '_googlecast._tcp';
-
       final devices = <Device>{};
       // Start the client with default options.
       await client.start();
       // Get the PTR record for the service.
       await for (final PtrResourceRecord ptr in client
-          .lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer(service))) {
+          .lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer(_service))) {
 
         await for (final SrvResourceRecord srv in client.lookup<SrvResourceRecord>(
             ResourceRecordQuery.service(ptr.domainName))) {
@@ -47,17 +52,10 @@ class ChromeCastAdapter extends CastAdapter {
             devices.add(Device(ip.address.address, chromecastName, srv.port, CastType.CHROMECAST, 1));
             setDevices(devices);
           }
-          /*await for (final IPAddressResourceRecord ip
-        in client.lookup<IPAddressResourceRecord>(
-            ResourceRecordQuery.addressIPv6(srv.target))) {
-            print(ip);
-          print('Service instance $chromecastName found at '
-              '${ip.address.address}:${srv.port}.');
-        }*/
         }
       }
       client.stop();
-    }catch(e){
+    } catch(e){
       if(!e.toString().contains('mDNS client must be started before calling lookup')){
         errorDebugPrint('performSingleDiscovery()', e);
         if(!flagCatchErrors) rethrow;
@@ -72,42 +70,56 @@ class ChromeCastAdapter extends CastAdapter {
   }
 
   @override
-  Future<void> connect(Device device) async {}
+  Future<void> connect(Device device) async {
+    CastSender _castSender = CastSender(
+      CastDevice(
+        port: device.port,
+        type: _service,
+        host: device.host,
+        name: device.name,
+      ),
+    );
+
+    bool connected = await _castSender.connect();
+    if (!connected) {
+      debugPrint("Failed to connect with ${device.name}");
+      _castSender = null;
+      return;
+    }
+
+    _sender = _castSender;
+
+    _castSender.launch();
+  }
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration start) {
-    /*
-    CastMedia(
-      title: 'Chromecast video 1',
-      contentId:
-          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      contentType: "audio/mp3",
-      images: ['https://picsum.photos/700'],
-    ),
-     */
-  }
+  void castUrl(String url, MediaData mediaData, Duration start) => _sender.load(CastMedia(
+    title: mediaData.title,
+    contentId: url,
+    contentType: "audio/mp3",
+  ));
 
   @override
   void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
 
   @override
-  Future<void> disconnect() async {}
+  Future<void> disconnect() => _sender.disconnect();
 
   @override
-  Future<void> play() async {}
+  Future<void> play() async => _sender.play();
 
   @override
-  Future<void> pause() async {}
+  Future<void> pause() async => _sender.pause();
 
   @override
-  Future<void> setPosition(Duration position) async {}
+  Future<void> setPosition(Duration position) async => _sender.seek(position.inSeconds.toDouble());
 
   @override
-  Future<Duration> getPosition() async => null;
+  Future<Duration> getPosition() async => Duration(seconds: _sender.castSession.castMediaStatus.position.floor());
 
   @override
-  Future<void> setVolume(int volume) async {}
+  Future<void> setVolume(int volume) async => _sender.setVolume(volume.toDouble());
 
   @override
-  Future<int> getVolume() async => null;
+  Future<int> getVolume() async => _sender.castSession.castMediaStatus.volume.floor();
 }

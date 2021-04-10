@@ -47,9 +47,8 @@ AudioCast.shutdown(); //stop device discovery
 ```
 ## Features
 
-| Feature                            | Android    | iOS     | Windows   | macOS     | Linux |
+| Feature                            | Android    | iOS     | Linux   | macOS     | Windows |
 | -------                            | :-------:  | :-----: | :-----: | :-----: | :-----: |
-| Chromecast                         |          |         |       |       |      |
-| Airplay                            |          |           |       |       |      |
+| Chromecast                         |   ✅       |     ✅    |   ✅    |     ✅  |      |
 | DLNA / UPnP                               | ✅        | ✅        | ✅      |     ✅  |   ✅   |
-| FireTV                             |          |           |       |       |      |
+| Airplay                            |          |           |       |       |      |
