@@ -2,7 +2,8 @@ library audio_cast;
 
 import 'dart:async';
 
-import 'package:audio_cast/src/adapter/adapter.dart';
+import 'package:audio_cast/src/adapter/adapter.dart' if (dart.library.html) 'package:audio_cast/src/adapter/adapter_web.dart';
+import 'package:audio_cast/src/adapter/cast_adapter.dart';
 import 'package:audio_cast/src/state_notifers.dart';
 import 'package:audio_cast/src/utils.dart';
 

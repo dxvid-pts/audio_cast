@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:audio_cast/src/adapter/cast_adapter.dart';
 import 'package:audio_cast/src/utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:file/memory.dart';
@@ -11,8 +12,6 @@ import 'package:xml/xml.dart';
 import 'dart:convert' show htmlEscape;
 
 import 'package:audio_cast/audio_cast.dart';
-
-import 'adapter.dart';
 
 typedef SetVolumeFunc = int Function(int volume);
 

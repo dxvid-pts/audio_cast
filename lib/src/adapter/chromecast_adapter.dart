@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_cast/audio_cast.dart';
+import 'package:audio_cast/src/adapter/cast_adapter.dart';
 import 'package:dart_chromecast/casting/cast_device.dart';
 import 'package:dart_chromecast/casting/cast_media.dart';
 import 'package:dart_chromecast/casting/cast_sender.dart';
@@ -11,7 +12,6 @@ import 'package:dart_chromecast/casting/cast_sender.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 
 import '../utils.dart';
-import 'adapter.dart';
 
 const _service = '_googlecast._tcp';
 
