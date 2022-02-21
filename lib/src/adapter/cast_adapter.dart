@@ -32,7 +32,7 @@ abstract class CastAdapter {
 
   Future<void> connect(Device device) async {}
 
-  void castUrl(String url, MediaData mediaData, Duration start) {}
+  void castUrl(String url, MediaData mediaData, Duration? start) {}
 
   void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
 
@@ -44,9 +44,9 @@ abstract class CastAdapter {
 
   Future<void> setPosition(Duration position) async {}
 
-  Future<Duration> getPosition() async => null;
+  Future<Duration?> getPosition() async => null;
 
   Future<void> setVolume(int volume) async {}
 
-  Future<int> getVolume() async => null;
+  Future<int?> getVolume() async => null;
 }

@@ -8,7 +8,7 @@ class DeviceListNotifier extends StateNotifier<Set<Device>> {
   void setDevices(Set<Device> newList) {
     if (newList != state) {
       if (newList.length == state.length) {
-        final nList = newList.toList(), sList = state.toList();
+        final List<Device> nList = newList.toList(), sList = state.toList();
         for (int i = 0; i < nList.length; i++) {
           if (nList[i] != sList[i]) {
             state = newList;
@@ -22,7 +22,7 @@ class DeviceListNotifier extends StateNotifier<Set<Device>> {
   }
 }
 
-class CurrentDeviceNotifier extends StateNotifier<Device> {
+class CurrentDeviceNotifier extends StateNotifier<Device?> {
   CurrentDeviceNotifier() : super(null);
 
   void setDevice(Device device) => state = device;

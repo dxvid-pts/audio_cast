@@ -19,7 +19,7 @@ external dynamic _getCastInstance();
 class _Options {
   external String get receiverApplicationId;
 
-  external factory _Options({String receiverApplicationId});
+  external factory _Options({String? receiverApplicationId});
 }
 
 const String _scriptId = 'cast-script';
@@ -30,7 +30,7 @@ class ChromeCastWebAdapter extends CastAdapter {
   @override
   void initialize() async {
     if (document.getElementById(_scriptId) == null)
-      document.body.append(Element.tag('script')
+      document.body?.append(Element.tag('script')
         ..setAttribute('src',
             'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1')
         ..setAttribute('id', _scriptId)
@@ -60,9 +60,9 @@ class ChromeCastWebAdapter extends CastAdapter {
               ..setAttribute('id', _castButtonId)
               ..setAttribute('width', '0px')
               ..setAttribute('height', '0px');
-            document.body.append(button);
+            document.body?.append(button);
             print(document.getElementById(_castButtonId) == null);
-            document.getElementById(_castButtonId).click();
+            document.getElementById(_castButtonId)!.click();
             //await Future.delayed(Duration(seconds: 1), ()=>document.getElementById(_castButtonId).click());
           }
           print("added castbutton");
@@ -79,7 +79,7 @@ class ChromeCastWebAdapter extends CastAdapter {
   Future<void> connect(Device device) async {}
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration start) {}
+  void castUrl(String url, MediaData mediaData, Duration? start) {}
 
   @override
   void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
@@ -97,11 +97,11 @@ class ChromeCastWebAdapter extends CastAdapter {
   Future<void> setPosition(Duration position) async {}
 
   @override
-  Future<Duration> getPosition() async => null;
+  Future<Duration?> getPosition() async => null;
 
   @override
   Future<void> setVolume(int volume) async {}
 
   @override
-  Future<int> getVolume() async => null;
+  Future<int?> getVolume() async => null;
 }
