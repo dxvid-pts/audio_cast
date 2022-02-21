@@ -14,7 +14,7 @@ final CurrentPlaybackStateNotifier _currentPlaybackState = CurrentPlaybackStateN
 final CurrentCastStateNotifier currentCastState = CurrentCastStateNotifier();
 
 class AudioCast {
-  static Device _currentPlaybackDevice;
+  static Device? _currentPlaybackDevice;
   static final Set<Function> listeners = {};
 
   static void initialize({bool debugPrint = true, bool catchErrors = true}) async {
@@ -73,7 +73,7 @@ class AudioCast {
       //connected to a cast device
       else {
         //not same device selected -> disconnect old + connect to new device TODO: Add port?
-        if (_currentPlaybackDevice.host != device.host) {
+        if (_currentPlaybackDevice?.host != device.host) {
           //disconnect current device
           await _currentAdapter.disconnect();
 
@@ -98,7 +98,7 @@ class AudioCast {
   }
 
   static Future<void> castAudioFromUrl(String url,
-      {Duration start, MediaData mediaData}) async {
+      {Duration? start, MediaData? mediaData}) async {
     try {
       mediaData ??= MediaData(title: url);
 
@@ -109,7 +109,7 @@ class AudioCast {
           throw ('Status: CastState.CONNECTING, you are currently not connected to a device.');
           break;
         case CastState.CONNECTED:
-          await _currentAdapter.castUrl(url, mediaData, start);
+          _currentAdapter.castUrl(url, mediaData, start);
           await play();
           break;
       }
@@ -197,7 +197,7 @@ class AudioCast {
     }
   }
 
-  static Future<Duration> getPosition() async {
+  static Future<Duration?> getPosition() async {
     try {
       if (_currentPlaybackState.state == PlaybackState.NO_AUDIO) throw ('No audio is currently playing');
 
@@ -244,7 +244,7 @@ class AudioCast {
     }
   }
 
-  static Future<int> getVolume()  async {
+  static Future<int?> getVolume()  async {
     try {
       return await _currentAdapter.getVolume();
     } catch (e) {
@@ -255,7 +255,7 @@ class AudioCast {
   }
 
   static CastAdapter get _currentAdapter =>
-      adapters[_currentPlaybackDevice.adapterId];
+      adapters[_currentPlaybackDevice!.adapterId];
 
   static void _refreshDeviceList() {
     var newList = <Device>{};
@@ -276,10 +276,10 @@ enum PlaybackState { PLAYING, PAUSED, BUFFERING, NO_AUDIO }
 class Device {
   const Device(this.host, this.name, this.port, this.type, this.adapterId, {this.params});
 
-  final String host, name;
+  final String? host, name;
   final int port, adapterId;
   final CastType type;
-  final Map<String, String> params;
+  final Map<String, String>? params;
 
   @override
   String toString() => 'Device($name, $host:$port, ${type.toString()})';
@@ -290,7 +290,7 @@ class Device {
       return false;
     }
 
-    return toString() == (other as Device).toString();
+    return toString() == other.toString();
   }
 
   @override

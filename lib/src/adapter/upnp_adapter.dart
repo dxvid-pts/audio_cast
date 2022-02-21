@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:file/memory.dart';
 import 'package:http_server/http_server.dart';
 import 'package:mp3_info/mp3_info.dart';
-import 'package:upnp/upnp.dart' as upnp;
+import 'package:upnp_ns/upnp.dart' as upnp;
 import 'package:xml/xml.dart';
 import 'dart:convert' show htmlEscape;
 
@@ -16,12 +16,12 @@ import 'package:audio_cast/audio_cast.dart';
 typedef SetVolumeFunc = int Function(int volume);
 
 class UPnPAdapter extends CastAdapter {
-  Future<String> ipFuture;
-  final Map<String, upnp.Device> upnpDevices = {};
-  upnp.Device currentDevice;
+  Future<String>? ipFuture;
+  final Map<String?, upnp.Device> upnpDevices = {};
+  upnp.Device? currentDevice;
   final disc = upnp.DeviceDiscoverer();
 
-  Future<upnp.Service> get service => currentDevice.getService('urn:upnp-org:serviceId:AVTransport');
+  Future<upnp.Service?> get service => currentDevice!.getService('urn:upnp-org:serviceId:AVTransport');
 
   @override
   void initialize() async => ipFuture = _getIp();
@@ -31,7 +31,7 @@ class UPnPAdapter extends CastAdapter {
     await disc.start(ipv6: false);
     await for(var client in disc.quickDiscoverClients()) {
       try {
-        var dev = await client.getDevice();
+        var dev = await (client.getDevice() as FutureOr<upnp.Device>);
 
         if (dev.deviceType != 'urn:schemas-upnp-org:device:MediaRenderer:1') {
           return;
@@ -72,16 +72,16 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration start) async {
+  void castUrl(String url, MediaData mediaData, Duration? start) async {
     debugPrint('Downloading audio...');
-    var bytes = (await http.get(url)).bodyBytes;
+    var bytes = (await http.get(Uri.parse(url))).bodyBytes;
     debugPrint('Downloaded audio');
 
     castBytes(bytes, mediaData, start);
   }
 
   @override
-  void castBytes(Uint8List bytes, MediaData mediaData, Duration start) async {
+  void castBytes(Uint8List bytes, MediaData mediaData, Duration? start) async {
     try {
       if (start != null) {
         var mp3 = MP3Processor.fromBytes(bytes);
@@ -91,7 +91,7 @@ class UPnPAdapter extends CastAdapter {
 
       _startServer(MemoryFileSystem().file('audio.mp3')..writeAsBytesSync(bytes));
 
-      var result = await (await service).setCurrentURI('http://${await ipFuture}:8888', mediaData);
+      var result = await (await service)!.setCurrentURI('http://${await ipFuture}:8888', mediaData);
 
       if (result.isNotEmpty) debugPrint(result.toString());
     } catch (e) {
@@ -101,29 +101,29 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  Future<void> disconnect() async => (await service).stopCurrentMedia();
+  Future<void> disconnect() async => (await service)!.stopCurrentMedia();
 
   @override
-  Future<void> play() async => (await service).playCurrentMedia();
+  Future<void> play() async => (await service)!.playCurrentMedia();
 
   @override
-  Future<void> pause() async => (await service).pauseCurrentMedia();
+  Future<void> pause() async => (await service)!.pauseCurrentMedia();
 
   @override
   //Specs: http://www.upnp.org/specs/av/UPnP-av-AVTransport-v3-Service-20101231.pdf (2.2.15)
-  Future<void> setPosition(Duration position) async => (await service).setPosition(position);
+  Future<void> setPosition(Duration position) async => (await service)!.setPosition(position);
 
   @override
   Future<Duration> getPosition() async {
-    var res = await (await service).getPositionInfo();
+    var res = await (await service)!.getPositionInfo();
 
-    var duration = _tryParsePosition('RelTime', res);
+    var duration = _tryParsePosition('RelTime', res as Map<String, String>);
     duration ??= _tryParsePosition('AbsTime', res);
 
-    return duration;
+    return duration!;
   }
 
-  Duration _tryParsePosition(String key, Map<String, String> res) {
+  Duration? _tryParsePosition(String key, Map<String, String> res) {
     try {
       final currentRelTime = res[key].toString().split(':');
 
@@ -141,10 +141,10 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  Future<int> getVolume() async => int.parse((await (await service).getVolume())['CurrentVolume']);
+  Future<int> getVolume() async => int.parse((await (await service)!.getVolume())['CurrentVolume']);
 
   @override
-  Future<void> setVolume(int volume) async => (await service).setVolume(volume);
+  Future<void> setVolume(int volume) async => (await service)!.setVolume(volume);
 
   void _startServer(File file) {
     //TODO: dispose server on disconnect;
@@ -154,7 +154,7 @@ class UPnPAdapter extends CastAdapter {
         var vd = VirtualDirectory('.');
         vd.jailRoot = false;
         server.listen((request) {
-          debugPrint('new request: ' + request.connectionInfo.remoteAddress.host);
+          debugPrint('new request: ' + request.connectionInfo!.remoteAddress.host);
           vd.serveFile(file, request);
         });
       }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
@@ -195,7 +195,7 @@ extension ServiceActions on upnp.Service {
 
   Future<Map<String, dynamic>> pauseCurrentMedia() => invokeEditedAction('Pause', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> playCurrentMedia({String Speed}) =>
+  Future<Map<String, dynamic>> playCurrentMedia({String? Speed}) =>
       invokeEditedAction('Play', {'InstanceID': '0', 'Speed': Speed ?? '1'});
 
   Future<Map<String, dynamic>> stopCurrentMedia() => invokeEditedAction('Stop', {'InstanceID': '0'});
@@ -241,7 +241,7 @@ extension EditedAction on upnp.Action{
         .rootElement;
 
     if (response.name.local != "Body") {
-      response = response.children.firstWhere((x) => x is XmlElement);
+      response = response.children.firstWhere((x) => x is XmlElement) as XmlElement;
     }
 
     if (const bool.fromEnvironment("upnp.action.show_response", defaultValue: false)) {
@@ -251,7 +251,7 @@ extension EditedAction on upnp.Action{
     if (response is XmlElement
         && !response.name.local.contains("Response") &&
         response.children.length > 1) {
-      response = response.children[1];
+      response = response.children[1] as XmlElement;
     }
 
     if (response.children.length == 1) {
