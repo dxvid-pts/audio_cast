@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:file/memory.dart';
 import 'package:http_server/http_server.dart';
 import 'package:mp3_info/mp3_info.dart';
-import 'package:upnp_ns/upnp.dart' as upnp;
+import 'package:upnp2/upnp.dart' as upnp;
 import 'package:xml/xml.dart';
 import 'dart:convert' show htmlEscape;
 
@@ -31,7 +31,9 @@ class UPnPAdapter extends CastAdapter {
     await disc.start(ipv6: false);
     await for(var client in disc.quickDiscoverClients()) {
       try {
-        var dev = await (client.getDevice() as FutureOr<upnp.Device>);
+        var dev = await client.getDevice();
+
+        if (dev == null) return;
 
         if (dev.deviceType != 'urn:schemas-upnp-org:device:MediaRenderer:1') {
           return;
@@ -91,9 +93,9 @@ class UPnPAdapter extends CastAdapter {
 
       _startServer(MemoryFileSystem().file('audio.mp3')..writeAsBytesSync(bytes));
 
-      var result = await (await service)!.setCurrentURI('http://${await ipFuture}:8888', mediaData);
+      var result = await (await service)?.setCurrentURI('http://${await ipFuture}:8888', mediaData);
 
-      if (result.isNotEmpty) debugPrint(result.toString());
+      if (result?.isNotEmpty == true) debugPrint(result.toString());
     } catch (e) {
       errorDebugPrint('castBytes(bytes, start, mediaData)', e);
       if (!flagCatchErrors) rethrow;
@@ -101,21 +103,21 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  Future<void> disconnect() async => (await service)!.stopCurrentMedia();
+  Future<void> disconnect() async => (await service)?.stopCurrentMedia();
 
   @override
-  Future<void> play() async => (await service)!.playCurrentMedia();
+  Future<void> play() async => (await service)?.playCurrentMedia();
 
   @override
-  Future<void> pause() async => (await service)!.pauseCurrentMedia();
+  Future<void> pause() async => (await service)?.pauseCurrentMedia();
 
   @override
   //Specs: http://www.upnp.org/specs/av/UPnP-av-AVTransport-v3-Service-20101231.pdf (2.2.15)
-  Future<void> setPosition(Duration position) async => (await service)!.setPosition(position);
+  Future<void> setPosition(Duration position) async => (await service)?.setPosition(position);
 
   @override
   Future<Duration> getPosition() async {
-    var res = await (await service)!.getPositionInfo();
+    var res = await (await service)?.getPositionInfo();
 
     var duration = _tryParsePosition('RelTime', res as Map<String, String>);
     duration ??= _tryParsePosition('AbsTime', res);
@@ -141,10 +143,10 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  Future<int> getVolume() async => int.parse((await (await service)!.getVolume())['CurrentVolume']);
+  Future<int> getVolume() async => int.parse((await (await service)?.getVolume())?['CurrentVolume']);
 
   @override
-  Future<void> setVolume(int volume) async => (await service)!.setVolume(volume);
+  Future<void> setVolume(int volume) async => (await service)?.setVolume(volume);
 
   void _startServer(File file) {
     //TODO: dispose server on disconnect;

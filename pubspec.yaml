@@ -18,7 +18,7 @@ dependencies:
   xml: ^5.3.1
   file: ^6.1.2
   js: ^0.6.4
-  upnp_ns: ^1.0.1
+  upnp2: ^3.0.4
 
 dev_dependencies:
   pedantic: ^1.11.1
