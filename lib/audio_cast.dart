@@ -29,13 +29,19 @@ class AudioCast {
 
     try {
       //initialize adapters
-      adapters.forEach((adapter) => adapter.initialize());
+      for (var adapter in adapters) {
+        adapter.initialize();
+      }
 
       listeners.add(currentCastState.addListener((CastState castState) {
-        if (castState == CastState.DISCONNECTED) {
-          adapters.forEach((adapter) => adapter.startDiscovery());
+        if (castState == CastState.disconnected) {
+          for (var adapter in adapters) {
+            adapter.startDiscovery();
+          }
         } else {
-          adapters.forEach((adapter) => adapter.cancelDiscovery());
+          for (var adapter in adapters) {
+            adapter.cancelDiscovery();
+          }
         }
       }));
 
@@ -43,9 +49,9 @@ class AudioCast {
       _refreshDeviceList();
 
       //Monitor listeners to refresh the device list
-      adapters.forEach((adapter) {
+      for (var adapter in adapters) {
         listeners.add(adapter.devices.addListener((_) => _refreshDeviceList()));
-      });
+      }
     } catch (e) {
       errorDebugPrint('initialize($debugPrint, $catchErrors)', e);
       if (!flagCatchErrors) rethrow;
@@ -53,14 +59,18 @@ class AudioCast {
   }
 
   static void shutdown() async {
-    if (currentCastState.state == CastState.CONNECTED) {
+    if (currentCastState.isConnected) {
       await disconnect();
     }
 
-    adapters.forEach((adapter) => adapter.cancelDiscovery());
+    for (var adapter in adapters) {
+      adapter.cancelDiscovery();
+    }
 
     //remove listeners
-    listeners.forEach((removeListener) => removeListener());
+    for (var removeListener in listeners) {
+      removeListener();
+    }
     listeners.clear();
 
     _engineInitiated = false;
@@ -69,8 +79,8 @@ class AudioCast {
   static Future<void> connectToDevice(Device device) async {
     try {
       //not connected to a device
-      if (currentCastState.state == CastState.DISCONNECTED) {
-        currentCastState.setState(CastState.CONNECTING);
+      if (currentCastState.isDisconnected) {
+        currentCastState.setState(CastState.connecting);
         await adapters[device.adapterId].connect(device);
       }
       //connected to a cast device
@@ -81,19 +91,19 @@ class AudioCast {
           await _currentAdapter.disconnect();
 
           //connect to new device
-          currentCastState.setState(CastState.CONNECTING);
+          currentCastState.setState(CastState.connecting);
           await adapters[device.adapterId].connect(device);
         }
       }
 
       //connecting succeeded
       _currentPlaybackDevice = device;
-      currentCastState.setState(CastState.CONNECTED);
+      currentCastState.setState(CastState.connected);
     }
     //connecting failed
     catch (e) {
       _currentPlaybackDevice = null;
-      currentCastState.setState(CastState.DISCONNECTED);
+      currentCastState.setState(CastState.disconnected);
 
       errorDebugPrint('connectToDevice($device)', e);
       if (!flagCatchErrors) rethrow;
@@ -105,16 +115,11 @@ class AudioCast {
     try {
       mediaData ??= MediaData(title: url);
 
-      switch (currentCastState.state) {
-        case CastState.DISCONNECTED:
-          throw ('Status: CastState.DISCONNECTED, no device is currently connected.');
-        case CastState.CONNECTING:
-          throw ('Status: CastState.CONNECTING, you are currently not connected to a device.');
-          break;
-        case CastState.CONNECTED:
-          _currentAdapter.castUrl(url, mediaData, start);
-          await play();
-          break;
+      if (currentCastState.isConnected) {
+        _currentAdapter.castUrl(url, mediaData, start);
+        await play();
+      } else {
+        throw ('no device is currently connected.');
       }
     } catch (e) {
       errorDebugPrint('castAudioFromUrl($url, $start, $mediaData)', e);
@@ -124,16 +129,19 @@ class AudioCast {
 
   static Future<void> disconnect() async {
     try {
-      if (currentCastState.state == CastState.DISCONNECTED)
+      if (currentCastState.isDisconnected) {
         throw 'Status: CastState.DISCONNECTED, no device is currently connected.';
-      if (_currentPlaybackDevice == null)
+      }
+      if (_currentPlaybackDevice == null) {
         throw 'No device is currently connected.';
-      if (currentCastState.state == CastState.CONNECTING)
+      }
+      if (currentCastState.isConnecting) {
         throw ('Status: CastState.CONNECTING, you are currently not connected to a device.');
+      }
 
       await _currentAdapter.disconnect();
       _currentPlaybackDevice = null;
-      currentCastState.setState(CastState.DISCONNECTED);
+      currentCastState.setState(CastState.disconnected);
     } catch (e) {
       errorDebugPrint('disconnect()', e);
       if (!flagCatchErrors) rethrow;
@@ -142,12 +150,13 @@ class AudioCast {
 
   static Future<void> play() async {
     try {
-      if (_currentPlaybackState.state == PlaybackState.PLAYING)
+      if (_currentPlaybackState.isPlaying) {
         throw ('Audio is already playing');
+      }
 
       await _currentAdapter.play();
 
-      _currentPlaybackState.setPlaybackState(PlaybackState.PLAYING);
+      _currentPlaybackState.setPlaybackState(PlaybackState.playing);
     } catch (e) {
       errorDebugPrint('play()', e);
       if (!flagCatchErrors) rethrow;
@@ -156,11 +165,12 @@ class AudioCast {
 
   static Future<void> pause() async {
     try {
-      if (_currentPlaybackState.state != PlaybackState.PLAYING)
+      if (_currentPlaybackState.isPlaying) {
         throw ('Audio isn\'t playing so it cant\'t be paused');
+      }
 
       await _currentAdapter.pause();
-      _currentPlaybackState.setPlaybackState(PlaybackState.PAUSED);
+      _currentPlaybackState.setPlaybackState(PlaybackState.paused);
     } catch (e) {
       errorDebugPrint('pause()', e);
       if (!flagCatchErrors) rethrow;
@@ -199,8 +209,9 @@ class AudioCast {
 
   static Future<void> setPosition(Duration position) async {
     try {
-      if (_currentPlaybackState.state == PlaybackState.NO_AUDIO)
+      if (!_currentPlaybackState.hasAudio) {
         throw ('No audio is currently playing');
+      }
 
       await _currentAdapter.setPosition(position);
     } catch (e) {
@@ -211,16 +222,18 @@ class AudioCast {
 
   static Future<Duration?> getPosition() async {
     try {
-      if (_currentPlaybackState.state == PlaybackState.NO_AUDIO)
+      if (!_currentPlaybackState.hasAudio) {
         throw ('No audio is currently playing');
+      }
 
       return _currentAdapter.getPosition();
     } catch (e) {
       errorDebugPrint('getPosition()', e);
-      if (!flagCatchErrors)
+      if (!flagCatchErrors) {
         rethrow;
-      else
+      } else {
         return null;
+      }
     }
   }
 
@@ -265,10 +278,11 @@ class AudioCast {
       return await _currentAdapter.getVolume();
     } catch (e) {
       errorDebugPrint('getVolume()', e);
-      if (!flagCatchErrors)
+      if (!flagCatchErrors) {
         rethrow;
-      else
+      } else {
         return null;
+      }
     }
   }
 
@@ -277,7 +291,9 @@ class AudioCast {
 
   static void _refreshDeviceList() {
     var newList = <Device>{};
-    adapters.forEach((adapter) => newList.addAll(adapter.devices.state));
+    for (var adapter in adapters) {
+      newList.addAll(adapter.devices.state);
+    }
 
     _devices.setDevices(newList);
   }
@@ -288,8 +304,8 @@ class AudioCast {
       _currentPlaybackState.stream;
 }
 
-enum CastType { CHROMECAST, AIRPLAY, DLNA, FIRETV }
-enum PlaybackState { PLAYING, PAUSED, BUFFERING, NO_AUDIO }
+enum CastType { chromecast, airplay, dlna, firetv }
+enum PlaybackState { playing, paused, buffering, noAudio }
 
 class Device {
   const Device(this.host, this.name, this.port, this.type, this.adapterId,

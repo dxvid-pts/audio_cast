@@ -54,7 +54,7 @@ class ChromeCastAdapter extends CastAdapter {
                 'Service instance $chromecastName found at ${ip.address.address}:${srv.port}.');
 
             devices.add(Device(ip.address.address, chromecastName, srv.port,
-                CastType.CHROMECAST, 1));
+                CastType.chromecast, 1));
             setDevices(devices);
           }
         }

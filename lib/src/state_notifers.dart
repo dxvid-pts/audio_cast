@@ -29,15 +29,25 @@ class CurrentDeviceNotifier extends StateNotifier<Device?> {
 }
 
 class CurrentPlaybackStateNotifier extends StateNotifier<PlaybackState> {
-  CurrentPlaybackStateNotifier() : super(PlaybackState.NO_AUDIO);
+  CurrentPlaybackStateNotifier() : super(PlaybackState.noAudio);
 
   void setPlaybackState(PlaybackState playbackState) => state = playbackState;
+
+  bool get isPlaying => state == PlaybackState.playing;
+
+  bool get hasAudio => state != PlaybackState.noAudio;
 }
 
 class CurrentCastStateNotifier extends StateNotifier<CastState> {
-  CurrentCastStateNotifier() : super(CastState.DISCONNECTED);
+  CurrentCastStateNotifier() : super(CastState.disconnected);
 
   void setState(CastState castState) => state = castState;
+
+  bool get isConnected => state == CastState.connected;
+
+  bool get isDisconnected => state == CastState.disconnected;
+
+  bool get isConnecting => state == CastState.connecting;
 }
 
 class FlagNotifier extends StateNotifier<bool> {

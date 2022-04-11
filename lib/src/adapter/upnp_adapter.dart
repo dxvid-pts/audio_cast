@@ -30,11 +30,14 @@ class UPnPAdapter extends CastAdapter {
   @override
   Future<void> performSingleDiscovery() async {
     await disc.start(ipv6: false);
-    await for (var client in disc.quickDiscoverClients()) {
+    await for (var client in disc.quickDiscoverClients(
+        timeout: const Duration(seconds: 30))) {
       try {
         var dev = await client.getDevice();
 
-        if (dev == null) return;
+        if (dev == null) {
+          return;
+        }
 
         if (dev.deviceType != 'urn:schemas-upnp-org:device:MediaRenderer:1') {
           return;
@@ -47,8 +50,9 @@ class UPnPAdapter extends CastAdapter {
         }
 
         setDevices(upnpDevices.values
-            .map((upnpDevice) => Device(
-                upnpDevice.url, upnpDevice.friendlyName, 0, CastType.DLNA, 0))
+            .map((upnpDevice) =>
+            Device(
+                upnpDevice.url, upnpDevice.friendlyName, 0, CastType.dlna, 0))
             .toSet());
 
         disc.stop();
@@ -93,7 +97,8 @@ class UPnPAdapter extends CastAdapter {
       }
 
       _startServer(
-          MemoryFileSystem().file('audio.mp3')..writeAsBytesSync(bytes));
+          MemoryFileSystem().file('audio.mp3')
+            ..writeAsBytesSync(bytes));
 
       var result = await (await service)
           ?.setCurrentURI('http://${await ipFuture}:8888', mediaData);
@@ -192,7 +197,7 @@ extension ServiceActions on upnp.Service {
         'InstanceID': '0',
         'CurrentURI': url,
         'CurrentURIMetaData': (htmlEscape.convert(XmlDocument.parse(
-                '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:sec="http://www.sec.co.kr/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
+            '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:sec="http://www.sec.co.kr/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
                 '<item id="0" parentID="-1" restricted="false">'
                 '<upnp:class>object.item.audioItem.musicTrack</upnp:class>'
                 '<dc:title>${mediaData.title}</dc:title>'
@@ -208,22 +213,24 @@ extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> pauseCurrentMedia() =>
       invokeEditedAction('Pause', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> playCurrentMedia({String? Speed}) =>
-      invokeEditedAction('Play', {'InstanceID': '0', 'Speed': Speed ?? '1'});
+  Future<Map<String, dynamic>> playCurrentMedia({String? speed}) =>
+      invokeEditedAction('Play', {'InstanceID': '0', 'Speed': speed ?? '1'});
 
   Future<Map<String, dynamic>> stopCurrentMedia() =>
       invokeEditedAction('Stop', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> setVolume(int volume) => invokeEditedAction(
-      'SetVolume',
-      {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
+  Future<Map<String, dynamic>> setVolume(int volume) =>
+      invokeEditedAction(
+          'SetVolume',
+          {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
 
   Future<Map<String, dynamic>> getVolume() =>
       invokeEditedAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
 
   Future<Map<String, dynamic>> setPosition(Duration position) {
     final target =
-        '${_timeString(position.inHours)}:${_timeString(position.inMinutes - position.inHours * 60)}:'
+        '${_timeString(position.inHours)}:${_timeString(
+        position.inMinutes - position.inHours * 60)}:'
         '${_timeString(position.inSeconds - position.inMinutes * 60)}';
 
     return invokeEditedAction(
@@ -233,28 +240,24 @@ extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> getPositionInfo() =>
       invokeEditedAction('GetPositionInfo', {'InstanceID': '0'});
 
-  Future<Map<String, String>> invokeEditedAction(
-      String name, Map<String, dynamic> args) async {
+  Future<Map<String, String>> invokeEditedAction(String name,
+      Map<String, dynamic> args) async {
     return await actions.firstWhere((it) => it.name == name).invoke(args);
   }
 }
 
-String _timeString(int i) => i == null
-    ? '00'
-    : i < 10
-        ? '0$i'
-        : '$i';
+String _timeString(int i) => i < 10 ? '0$i' : '$i';
 
 extension EditedAction on upnp.Action {
   Future<Map<String, String>> invokeEdited(Map<String, dynamic> args) async {
-    var param = '  <u:${name} xmlns:u="${service.type}">' +
+    var param = '  <u:$name xmlns:u="${service.type}">' +
         args.keys.map((it) {
           String argsIt = args[it].toString();
           argsIt = argsIt.replaceAll("&quot;", '"');
           argsIt = argsIt.replaceAll("&#47;", '/');
-          return "<${it}>${argsIt}</${it}>";
+          return "<$it>$argsIt</$it>";
         }).join("\n") +
-        '</u:${name}>\n';
+        '</u:$name>\n';
 
     var result = await service.sendToControlUrl(name, param);
     var doc = XmlDocument.parse(result);
@@ -262,7 +265,7 @@ extension EditedAction on upnp.Action {
 
     if (response.name.local != "Body") {
       response =
-          response.children.firstWhere((x) => x is XmlElement) as XmlElement;
+      response.children.firstWhere((x) => x is XmlElement) as XmlElement;
     }
 
     if (const bool.fromEnvironment("upnp.action.show_response",
@@ -270,8 +273,7 @@ extension EditedAction on upnp.Action {
       print("Got Action Response: ${response.toXmlString()}");
     }
 
-    if (response is XmlElement &&
-        !response.name.local.contains("Response") &&
+    if (!response.name.local.contains("Response") &&
         response.children.length > 1) {
       response = response.children[1] as XmlElement;
     }
@@ -292,7 +294,7 @@ extension EditedAction on upnp.Action {
     }
 
     List<XmlElement> results =
-        response.children.whereType<XmlElement>().toList();
+    response.children.whereType<XmlElement>().toList();
     var map = <String, String>{};
     for (XmlElement r in results) {
       map[r.name.local] = r.text;
