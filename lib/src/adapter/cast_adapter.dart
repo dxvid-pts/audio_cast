@@ -19,7 +19,7 @@ abstract class CastAdapter {
 
   void startDiscovery() async {
     debugPrint("startDiscovery");
-    if(_discovery) return;
+    if (_discovery) return;
     _discovery = true;
 
     while (_discovery) {

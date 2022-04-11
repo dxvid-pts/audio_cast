@@ -40,12 +40,11 @@ class CurrentCastStateNotifier extends StateNotifier<CastState> {
   void setState(CastState castState) => state = castState;
 }
 
-
 class FlagNotifier extends StateNotifier<bool> {
   FlagNotifier() : super(false);
 
   void setFlag(bool newState) {
-    if(newState != state) state = newState;
+    if (newState != state) state = newState;
   }
 
   bool get flag => state;

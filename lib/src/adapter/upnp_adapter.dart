@@ -1,17 +1,17 @@
 import 'dart:async';
+import 'dart:convert' show htmlEscape;
 import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:audio_cast/audio_cast.dart';
 import 'package:audio_cast/src/adapter/cast_adapter.dart';
 import 'package:audio_cast/src/utils.dart';
-import 'package:http/http.dart' as http;
 import 'package:file/memory.dart';
+import 'package:http/http.dart' as http;
 import 'package:http_server/http_server.dart';
 import 'package:mp3_info/mp3_info.dart';
 import 'package:upnp2/upnp.dart' as upnp;
 import 'package:xml/xml.dart';
-import 'dart:convert' show htmlEscape;
-
-import 'package:audio_cast/audio_cast.dart';
 
 typedef SetVolumeFunc = int Function(int volume);
 
@@ -21,7 +21,8 @@ class UPnPAdapter extends CastAdapter {
   upnp.Device? currentDevice;
   final disc = upnp.DeviceDiscoverer();
 
-  Future<upnp.Service?> get service => currentDevice!.getService('urn:upnp-org:serviceId:AVTransport');
+  Future<upnp.Service?> get service =>
+      currentDevice!.getService('urn:upnp-org:serviceId:AVTransport');
 
   @override
   void initialize() async => ipFuture = _getIp();
@@ -29,7 +30,7 @@ class UPnPAdapter extends CastAdapter {
   @override
   Future<void> performSingleDiscovery() async {
     await disc.start(ipv6: false);
-    await for(var client in disc.quickDiscoverClients()) {
+    await for (var client in disc.quickDiscoverClients()) {
       try {
         var dev = await client.getDevice();
 
@@ -47,7 +48,7 @@ class UPnPAdapter extends CastAdapter {
 
         setDevices(upnpDevices.values
             .map((upnpDevice) => Device(
-            upnpDevice.url, upnpDevice.friendlyName, 0, CastType.DLNA, 0))
+                upnpDevice.url, upnpDevice.friendlyName, 0, CastType.DLNA, 0))
             .toSet());
 
         disc.stop();
@@ -91,9 +92,11 @@ class UPnPAdapter extends CastAdapter {
         bytes = cutMp3(bytes, start, mp3.bitrate, mp3.duration);
       }
 
-      _startServer(MemoryFileSystem().file('audio.mp3')..writeAsBytesSync(bytes));
+      _startServer(
+          MemoryFileSystem().file('audio.mp3')..writeAsBytesSync(bytes));
 
-      var result = await (await service)?.setCurrentURI('http://${await ipFuture}:8888', mediaData);
+      var result = await (await service)
+          ?.setCurrentURI('http://${await ipFuture}:8888', mediaData);
 
       if (result?.isNotEmpty == true) debugPrint(result.toString());
     } catch (e) {
@@ -113,7 +116,8 @@ class UPnPAdapter extends CastAdapter {
 
   @override
   //Specs: http://www.upnp.org/specs/av/UPnP-av-AVTransport-v3-Service-20101231.pdf (2.2.15)
-  Future<void> setPosition(Duration position) async => (await service)?.setPosition(position);
+  Future<void> setPosition(Duration position) async =>
+      (await service)?.setPosition(position);
 
   @override
   Future<Duration> getPosition() async {
@@ -143,10 +147,15 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  Future<int> getVolume() async => int.parse((await (await service)?.getVolume())?['CurrentVolume']);
+  Future<int> getVolume() async {
+    final svc = await service;
+    final volume = await svc?.getVolume();
+    return int.parse(volume?['CurrentVolume'] as String);
+  }
 
   @override
-  Future<void> setVolume(int volume) async => (await service)?.setVolume(volume);
+  Future<void> setVolume(int volume) async =>
+      (await service)?.setVolume(volume);
 
   void _startServer(File file) {
     //TODO: dispose server on disconnect;
@@ -156,7 +165,8 @@ class UPnPAdapter extends CastAdapter {
         var vd = VirtualDirectory('.');
         vd.jailRoot = false;
         server.listen((request) {
-          debugPrint('new request: ' + request.connectionInfo!.remoteAddress.host);
+          debugPrint(
+              'new request: ' + request.connectionInfo!.remoteAddress.host);
           vd.serveFile(file, request);
         });
       }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
@@ -195,15 +205,18 @@ extension ServiceActions on upnp.Service {
             .toString()))
       });
 
-  Future<Map<String, dynamic>> pauseCurrentMedia() => invokeEditedAction('Pause', {'InstanceID': '0'});
+  Future<Map<String, dynamic>> pauseCurrentMedia() =>
+      invokeEditedAction('Pause', {'InstanceID': '0'});
 
   Future<Map<String, dynamic>> playCurrentMedia({String? Speed}) =>
       invokeEditedAction('Play', {'InstanceID': '0', 'Speed': Speed ?? '1'});
 
-  Future<Map<String, dynamic>> stopCurrentMedia() => invokeEditedAction('Stop', {'InstanceID': '0'});
+  Future<Map<String, dynamic>> stopCurrentMedia() =>
+      invokeEditedAction('Stop', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> setVolume(int volume) =>
-      invokeEditedAction('SetVolume', {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
+  Future<Map<String, dynamic>> setVolume(int volume) => invokeEditedAction(
+      'SetVolume',
+      {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
 
   Future<Map<String, dynamic>> getVolume() =>
       invokeEditedAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
@@ -217,41 +230,48 @@ extension ServiceActions on upnp.Service {
         'Seek', {'InstanceID': '0', 'Unit': 'REL_TIME', 'Target': target});
   }
 
-  Future<Map<String, dynamic>> getPositionInfo() => invokeEditedAction('GetPositionInfo', {'InstanceID': '0'});
+  Future<Map<String, dynamic>> getPositionInfo() =>
+      invokeEditedAction('GetPositionInfo', {'InstanceID': '0'});
 
   Future<Map<String, String>> invokeEditedAction(
-      String name,
-      Map<String, dynamic> args) async {
+      String name, Map<String, dynamic> args) async {
     return await actions.firstWhere((it) => it.name == name).invoke(args);
   }
 }
 
-String _timeString(int i) => i == null ? '00' : i < 10 ? '0$i' : '$i';
+String _timeString(int i) => i == null
+    ? '00'
+    : i < 10
+        ? '0$i'
+        : '$i';
 
-extension EditedAction on upnp.Action{
+extension EditedAction on upnp.Action {
   Future<Map<String, String>> invokeEdited(Map<String, dynamic> args) async {
-    var param = '  <u:${name} xmlns:u="${service.type}">' + args.keys.map((it) {
-      String argsIt = args[it].toString();
-      argsIt = argsIt.replaceAll("&quot;", '"');
-      argsIt = argsIt.replaceAll("&#47;", '/');
-      return "<${it}>${argsIt}</${it}>";
-    }).join("\n") + '</u:${name}>\n';
+    var param = '  <u:${name} xmlns:u="${service.type}">' +
+        args.keys.map((it) {
+          String argsIt = args[it].toString();
+          argsIt = argsIt.replaceAll("&quot;", '"');
+          argsIt = argsIt.replaceAll("&#47;", '/');
+          return "<${it}>${argsIt}</${it}>";
+        }).join("\n") +
+        '</u:${name}>\n';
 
     var result = await service.sendToControlUrl(name, param);
     var doc = XmlDocument.parse(result);
-    XmlElement response = doc
-        .rootElement;
+    XmlElement response = doc.rootElement;
 
     if (response.name.local != "Body") {
-      response = response.children.firstWhere((x) => x is XmlElement) as XmlElement;
+      response =
+          response.children.firstWhere((x) => x is XmlElement) as XmlElement;
     }
 
-    if (const bool.fromEnvironment("upnp.action.show_response", defaultValue: false)) {
+    if (const bool.fromEnvironment("upnp.action.show_response",
+        defaultValue: false)) {
       print("Got Action Response: ${response.toXmlString()}");
     }
 
-    if (response is XmlElement
-        && !response.name.local.contains("Response") &&
+    if (response is XmlElement &&
+        !response.name.local.contains("Response") &&
         response.children.length > 1) {
       response = response.children[1] as XmlElement;
     }
@@ -266,13 +286,13 @@ extension EditedAction on upnp.Action{
       }
     }
 
-    if (const bool.fromEnvironment("upnp.action.show_response", defaultValue: false)) {
+    if (const bool.fromEnvironment("upnp.action.show_response",
+        defaultValue: false)) {
       print("Got Action Response (Real): ${response.toXmlString()}");
     }
 
-    List<XmlElement> results = response.children
-        .whereType<XmlElement>()
-        .toList();
+    List<XmlElement> results =
+        response.children.whereType<XmlElement>().toList();
     var map = <String, String>{};
     for (XmlElement r in results) {
       map[r.name.local] = r.text;
