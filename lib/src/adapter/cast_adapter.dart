@@ -1,8 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:audio_cast/audio_cast.dart';
-import 'package:audio_cast/src/state_notifers.dart';
-import 'package:audio_cast/src/utils.dart';
+import 'package:audio_cast/src/util/state_notifiers.dart';
+import 'package:audio_cast/src/util/utils.dart';
+import 'package:mp3_info/mp3_info.dart';
 
 abstract class CastAdapter {
   final DeviceListNotifier devices = DeviceListNotifier();
@@ -10,7 +11,7 @@ abstract class CastAdapter {
 
   void initialize() {}
 
-  Future<void> performSingleDiscovery() async {}
+  Future<void> performSingleDiscovery();
 
   void cancelDiscovery() {
     debugPrint("cancelDiscovery");
@@ -32,9 +33,29 @@ abstract class CastAdapter {
 
   Future<void> connect(Device device) async {}
 
-  void castUrl(String url, MediaData mediaData, Duration? start) {}
+  Future<void> castUrl(String url, MediaData mediaData) async {}
 
-  void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
+  /// This methods casts an mp3 file to the device via an internal server
+  /// and the castUrl method. This currently only supports mp3
+  Future<void> castBytes(
+      Uint8List bytes, MediaData mediaData, Duration? start) async {
+    try {
+      if (start != null) {
+        var mp3 = MP3Processor.fromBytes(bytes);
+
+        bytes = cutMp3(bytes, start, mp3.bitrate, mp3.duration);
+      }
+
+      String url = await startServer(bytes);
+
+      await castUrl(url, mediaData);
+    } catch (e) {
+      errorDebugPrint('castBytes(bytes, start, mediaData)', e);
+      if (!flagCatchErrors) rethrow;
+    }
+  }
+
+  Future<String> startServer(Uint8List bytes);
 
   Future<void> disconnect() async {}
 

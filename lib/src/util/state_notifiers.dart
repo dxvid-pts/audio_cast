@@ -1,5 +1,5 @@
 import 'package:audio_cast/audio_cast.dart';
-import 'package:audio_cast/src/utils.dart';
+import 'package:audio_cast/src/util/utils.dart';
 import 'package:state_notifier/state_notifier.dart';
 
 class DeviceListNotifier extends StateNotifier<Set<Device>> {

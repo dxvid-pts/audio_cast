@@ -1,19 +1,19 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:audio_cast/audio_cast.dart';
 import 'package:audio_cast/src/adapter/cast_adapter.dart';
+import 'package:audio_cast/src/util/io_server.dart';
 import 'package:dart_chromecast/casting/cast_device.dart';
 import 'package:dart_chromecast/casting/cast_media.dart';
 import 'package:dart_chromecast/casting/cast_sender.dart';
 import 'package:multicast_dns/multicast_dns.dart';
 
-import '../utils.dart';
+import '../util/utils.dart';
 
 const _service = '_googlecast._tcp';
 
-class ChromeCastAdapter extends CastAdapter {
+class ChromeCastAdapter extends CastAdapter with MediaServerMixin {
   final client = !Platform.isAndroid
       ? MDnsClient()
       : MDnsClient(
@@ -100,18 +100,19 @@ class ChromeCastAdapter extends CastAdapter {
   }
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration? start) =>
-      _sender.load(CastMedia(
-        title: mediaData.title,
-        contentId: url,
-        contentType: "audio/mp3",
-      ));
+  Future<void> castUrl(String url, MediaData mediaData) async {
+    _sender.load(CastMedia(
+      title: mediaData.title,
+      contentId: url,
+      contentType: "audio/mp3",
+    ));
+  }
 
   @override
-  void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
-
-  @override
-  Future<void> disconnect() => _sender.disconnect();
+  Future<void> disconnect() async {
+    _sender.disconnect();
+    await stopServer();
+  }
 
   @override
   Future<void> play() async => _sender.play();

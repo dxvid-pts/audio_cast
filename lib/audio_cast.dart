@@ -5,8 +5,8 @@ import 'dart:async';
 import 'package:audio_cast/src/adapter/adapter.dart'
     if (dart.library.html) 'package:audio_cast/src/adapter/adapter_web.dart';
 import 'package:audio_cast/src/adapter/cast_adapter.dart';
-import 'package:audio_cast/src/state_notifers.dart';
-import 'package:audio_cast/src/utils.dart';
+import 'package:audio_cast/src/util/state_notifiers.dart';
+import 'package:audio_cast/src/util/utils.dart';
 
 bool _engineInitiated = false;
 
@@ -14,6 +14,7 @@ final DeviceListNotifier _devices = DeviceListNotifier();
 final CurrentPlaybackStateNotifier _currentPlaybackState =
     CurrentPlaybackStateNotifier();
 final CurrentCastStateNotifier currentCastState = CurrentCastStateNotifier();
+
 
 class AudioCast {
   static Device? _currentPlaybackDevice;
@@ -111,18 +112,18 @@ class AudioCast {
   }
 
   static Future<void> castAudioFromUrl(String url,
-      {Duration? start, MediaData? mediaData}) async {
+      {MediaData? mediaData}) async {
     try {
       mediaData ??= MediaData(title: url);
 
       if (currentCastState.isConnected) {
-        _currentAdapter.castUrl(url, mediaData, start);
+        await _currentAdapter.castUrl(url, mediaData);
         await play();
       } else {
         throw ('no device is currently connected.');
       }
     } catch (e) {
-      errorDebugPrint('castAudioFromUrl($url, $start, $mediaData)', e);
+      errorDebugPrint('castAudioFromUrl($url, $mediaData)', e);
       if (!flagCatchErrors) rethrow;
     }
   }

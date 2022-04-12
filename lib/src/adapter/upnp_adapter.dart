@@ -1,22 +1,16 @@
 import 'dart:async';
 import 'dart:convert' show htmlEscape;
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:audio_cast/audio_cast.dart';
 import 'package:audio_cast/src/adapter/cast_adapter.dart';
-import 'package:audio_cast/src/utils.dart';
-import 'package:file/memory.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_server/http_server.dart';
-import 'package:mp3_info/mp3_info.dart';
+import 'package:audio_cast/src/util/io_server.dart';
+import 'package:audio_cast/src/util/utils.dart';
 import 'package:upnp2/upnp.dart' as upnp;
 import 'package:xml/xml.dart';
 
 typedef SetVolumeFunc = int Function(int volume);
 
-class UPnPAdapter extends CastAdapter {
-  Future<String>? ipFuture;
+class UPnPAdapter extends CastAdapter with MediaServerMixin {
   final Map<String?, upnp.Device> upnpDevices = {};
   upnp.Device? currentDevice;
   final disc = upnp.DeviceDiscoverer();
@@ -25,13 +19,10 @@ class UPnPAdapter extends CastAdapter {
       currentDevice!.getService('urn:upnp-org:serviceId:AVTransport');
 
   @override
-  void initialize() async => ipFuture = _getIp();
-
-  @override
   Future<void> performSingleDiscovery() async {
     await disc.start(ipv6: false);
-    await for (var client in disc.quickDiscoverClients(
-        timeout: const Duration(seconds: 30))) {
+    await for (var client
+        in disc.quickDiscoverClients(timeout: const Duration(seconds: 30))) {
       try {
         var dev = await client.getDevice();
 
@@ -50,8 +41,7 @@ class UPnPAdapter extends CastAdapter {
         }
 
         setDevices(upnpDevices.values
-            .map((upnpDevice) =>
-            Device(
+            .map((upnpDevice) => Device(
                 upnpDevice.url, upnpDevice.friendlyName, 0, CastType.dlna, 0))
             .toSet());
 
@@ -79,39 +69,22 @@ class UPnPAdapter extends CastAdapter {
   }
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration? start) async {
-    debugPrint('Downloading audio...');
-    var bytes = (await http.get(Uri.parse(url))).bodyBytes;
-    debugPrint('Downloaded audio');
-
-    castBytes(bytes, mediaData, start);
-  }
-
-  @override
-  void castBytes(Uint8List bytes, MediaData mediaData, Duration? start) async {
+  Future<void> castUrl(String url, MediaData mediaData) async {
     try {
-      if (start != null) {
-        var mp3 = MP3Processor.fromBytes(bytes);
-
-        bytes = cutMp3(bytes, start, mp3.bitrate, mp3.duration);
-      }
-
-      _startServer(
-          MemoryFileSystem().file('audio.mp3')
-            ..writeAsBytesSync(bytes));
-
-      var result = await (await service)
-          ?.setCurrentURI('http://${await ipFuture}:8888', mediaData);
+      var result = await (await service)?.setCurrentURI(url, mediaData);
 
       if (result?.isNotEmpty == true) debugPrint(result.toString());
     } catch (e) {
-      errorDebugPrint('castBytes(bytes, start, mediaData)', e);
+      errorDebugPrint('castUrl(url, mediaData)', e);
       if (!flagCatchErrors) rethrow;
     }
   }
 
   @override
-  Future<void> disconnect() async => (await service)?.stopCurrentMedia();
+  Future<void> disconnect() async {
+    (await service)?.stopCurrentMedia();
+    await stopServer();
+  }
 
   @override
   Future<void> play() async => (await service)?.playCurrentMedia();
@@ -161,34 +134,6 @@ class UPnPAdapter extends CastAdapter {
   @override
   Future<void> setVolume(int volume) async =>
       (await service)?.setVolume(volume);
-
-  void _startServer(File file) {
-    //TODO: dispose server on disconnect;
-    //TODO: find free port / autogenerate
-    runZoned(() {
-      HttpServer.bind(InternetAddress.anyIPv4, 8888).then((HttpServer server) {
-        var vd = VirtualDirectory('.');
-        vd.jailRoot = false;
-        server.listen((request) {
-          debugPrint(
-              'new request: ' + request.connectionInfo!.remoteAddress.host);
-          vd.serveFile(file, request);
-        });
-      }, onError: (e, stackTrace) => print('Oh noes! $e $stackTrace'));
-    });
-  }
-
-  Future<String> _getIp() async {
-    for (var interface in await NetworkInterface.list()) {
-      for (var a in interface.addresses) {
-        if (a.type == InternetAddressType.IPv4) {
-          return a.address;
-        }
-      }
-    }
-
-    return '';
-  }
 }
 
 extension ServiceActions on upnp.Service {
@@ -197,7 +142,7 @@ extension ServiceActions on upnp.Service {
         'InstanceID': '0',
         'CurrentURI': url,
         'CurrentURIMetaData': (htmlEscape.convert(XmlDocument.parse(
-            '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:sec="http://www.sec.co.kr/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
+                '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:sec="http://www.sec.co.kr/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'
                 '<item id="0" parentID="-1" restricted="false">'
                 '<upnp:class>object.item.audioItem.musicTrack</upnp:class>'
                 '<dc:title>${mediaData.title}</dc:title>'
@@ -219,18 +164,16 @@ extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> stopCurrentMedia() =>
       invokeEditedAction('Stop', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> setVolume(int volume) =>
-      invokeEditedAction(
-          'SetVolume',
-          {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
+  Future<Map<String, dynamic>> setVolume(int volume) => invokeEditedAction(
+      'SetVolume',
+      {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
 
   Future<Map<String, dynamic>> getVolume() =>
       invokeEditedAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
 
   Future<Map<String, dynamic>> setPosition(Duration position) {
     final target =
-        '${_timeString(position.inHours)}:${_timeString(
-        position.inMinutes - position.inHours * 60)}:'
+        '${_timeString(position.inHours)}:${_timeString(position.inMinutes - position.inHours * 60)}:'
         '${_timeString(position.inSeconds - position.inMinutes * 60)}';
 
     return invokeEditedAction(
@@ -240,8 +183,8 @@ extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> getPositionInfo() =>
       invokeEditedAction('GetPositionInfo', {'InstanceID': '0'});
 
-  Future<Map<String, String>> invokeEditedAction(String name,
-      Map<String, dynamic> args) async {
+  Future<Map<String, String>> invokeEditedAction(
+      String name, Map<String, dynamic> args) async {
     return await actions.firstWhere((it) => it.name == name).invoke(args);
   }
 }
@@ -265,7 +208,7 @@ extension EditedAction on upnp.Action {
 
     if (response.name.local != "Body") {
       response =
-      response.children.firstWhere((x) => x is XmlElement) as XmlElement;
+          response.children.firstWhere((x) => x is XmlElement) as XmlElement;
     }
 
     if (const bool.fromEnvironment("upnp.action.show_response",
@@ -294,7 +237,7 @@ extension EditedAction on upnp.Action {
     }
 
     List<XmlElement> results =
-    response.children.whereType<XmlElement>().toList();
+        response.children.whereType<XmlElement>().toList();
     var map = <String, String>{};
     for (XmlElement r in results) {
       map[r.name.local] = r.text;

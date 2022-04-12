@@ -80,10 +80,12 @@ class ChromeCastWebAdapter extends CastAdapter {
   Future<void> connect(Device device) async {}
 
   @override
-  void castUrl(String url, MediaData mediaData, Duration? start) {}
+  Future<void> castUrl(String url, MediaData mediaData) async {}
 
   @override
-  void castBytes(Uint8List bytes, MediaData mediaData, Duration start) {}
+  Future<void> castBytes(Uint8List bytes, MediaData mediaData, Duration? start) {
+    throw UnimplementedError("casting bytes from the web is not supported");
+  }
 
   @override
   Future<void> disconnect() async {}
@@ -105,4 +107,9 @@ class ChromeCastWebAdapter extends CastAdapter {
 
   @override
   Future<int?> getVolume() async => null;
+
+  @override
+  Future<String> startServer(Uint8List bytes) {
+    throw UnimplementedError("casting files from the web is not supported");
+  }
 }
