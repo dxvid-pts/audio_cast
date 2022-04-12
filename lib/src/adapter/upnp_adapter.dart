@@ -36,7 +36,7 @@ class UPnPAdapter extends CastAdapter {
         if (dev == null) return;
 
         if (dev.deviceType != 'urn:schemas-upnp-org:device:MediaRenderer:1') {
-          return;
+          continue;
         }
 
         if (upnpDevices.containsKey(dev.url)) {
