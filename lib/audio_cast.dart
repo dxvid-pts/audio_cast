@@ -1,6 +1,7 @@
 library audio_cast;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:audio_cast/src/adapter/adapter.dart'
     if (dart.library.html) 'package:audio_cast/src/adapter/adapter_web.dart';
@@ -14,7 +15,6 @@ final DeviceListNotifier _devices = DeviceListNotifier();
 final CurrentPlaybackStateNotifier _currentPlaybackState =
     CurrentPlaybackStateNotifier();
 final CurrentCastStateNotifier currentCastState = CurrentCastStateNotifier();
-
 
 class AudioCast {
   static Device? _currentPlaybackDevice;
@@ -128,6 +128,24 @@ class AudioCast {
     }
   }
 
+  /// This method plays an mp3 from bytes
+  static Future<void> castBytes(Uint8List bytes,
+      {MediaData? mediaData, Duration? start}) async {
+    try {
+      mediaData ??= MediaData(title: '');
+
+      if (currentCastState.isConnected) {
+        await _currentAdapter.castBytes(bytes, mediaData, start);
+        await play();
+      } else {
+        throw ('no device is currently connected.');
+      }
+    } catch (e) {
+      errorDebugPrint('castAudioFromBytes(${bytes.length}, $mediaData, $start)', e);
+      if (!flagCatchErrors) rethrow;
+    }
+  }
+
   static Future<void> disconnect() async {
     try {
       if (currentCastState.isDisconnected) {
@@ -166,7 +184,7 @@ class AudioCast {
 
   static Future<void> pause() async {
     try {
-      if (_currentPlaybackState.isPlaying) {
+      if (!_currentPlaybackState.isPlaying) {
         throw ('Audio isn\'t playing so it cant\'t be paused');
       }
 

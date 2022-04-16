@@ -138,7 +138,7 @@ class UPnPAdapter extends CastAdapter with MediaServerMixin {
 
 extension ServiceActions on upnp.Service {
   Future<Map<String, dynamic>> setCurrentURI(String url, MediaData mediaData) =>
-      invokeEditedAction('SetAVTransportURI', {
+      invokeAction('SetAVTransportURI', {
         'InstanceID': '0',
         'CurrentURI': url,
         'CurrentURIMetaData': (htmlEscape.convert(XmlDocument.parse(
@@ -156,92 +156,32 @@ extension ServiceActions on upnp.Service {
       });
 
   Future<Map<String, dynamic>> pauseCurrentMedia() =>
-      invokeEditedAction('Pause', {'InstanceID': '0'});
+      invokeAction('Pause', {'InstanceID': '0'});
 
   Future<Map<String, dynamic>> playCurrentMedia({String? speed}) =>
-      invokeEditedAction('Play', {'InstanceID': '0', 'Speed': speed ?? '1'});
+      invokeAction('Play', {'InstanceID': '0', 'Speed': speed ?? '1'});
 
   Future<Map<String, dynamic>> stopCurrentMedia() =>
-      invokeEditedAction('Stop', {'InstanceID': '0'});
+      invokeAction('Stop', {'InstanceID': '0'});
 
-  Future<Map<String, dynamic>> setVolume(int volume) => invokeEditedAction(
+  Future<Map<String, dynamic>> setVolume(int volume) => invokeAction(
       'SetVolume',
       {'InstanceID': '0', 'Channel': 'Master', 'DesiredVolume': volume});
 
   Future<Map<String, dynamic>> getVolume() =>
-      invokeEditedAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
+      invokeAction('GetVolume', {'InstanceID': '0', 'Channel': 'Master'});
 
   Future<Map<String, dynamic>> setPosition(Duration position) {
     final target =
         '${_timeString(position.inHours)}:${_timeString(position.inMinutes - position.inHours * 60)}:'
         '${_timeString(position.inSeconds - position.inMinutes * 60)}';
 
-    return invokeEditedAction(
+    return invokeAction(
         'Seek', {'InstanceID': '0', 'Unit': 'REL_TIME', 'Target': target});
   }
 
   Future<Map<String, dynamic>> getPositionInfo() =>
-      invokeEditedAction('GetPositionInfo', {'InstanceID': '0'});
-
-  Future<Map<String, String>> invokeEditedAction(
-      String name, Map<String, dynamic> args) async {
-    return await actions.firstWhere((it) => it.name == name).invoke(args);
-  }
+      invokeAction('GetPositionInfo', {'InstanceID': '0'});
 }
 
 String _timeString(int i) => i < 10 ? '0$i' : '$i';
-
-extension EditedAction on upnp.Action {
-  Future<Map<String, String>> invokeEdited(Map<String, dynamic> args) async {
-    var param = '  <u:$name xmlns:u="${service.type}">' +
-        args.keys.map((it) {
-          String argsIt = args[it].toString();
-          argsIt = argsIt.replaceAll("&quot;", '"');
-          argsIt = argsIt.replaceAll("&#47;", '/');
-          return "<$it>$argsIt</$it>";
-        }).join("\n") +
-        '</u:$name>\n';
-
-    var result = await service.sendToControlUrl(name, param);
-    var doc = XmlDocument.parse(result);
-    XmlElement response = doc.rootElement;
-
-    if (response.name.local != "Body") {
-      response =
-          response.children.firstWhere((x) => x is XmlElement) as XmlElement;
-    }
-
-    if (const bool.fromEnvironment("upnp.action.show_response",
-        defaultValue: false)) {
-      print("Got Action Response: ${response.toXmlString()}");
-    }
-
-    if (!response.name.local.contains("Response") &&
-        response.children.length > 1) {
-      response = response.children[1] as XmlElement;
-    }
-
-    if (response.children.length == 1) {
-      var d = response.children[0];
-
-      if (d is XmlElement) {
-        if (d.name.local.contains("Response")) {
-          response = d;
-        }
-      }
-    }
-
-    if (const bool.fromEnvironment("upnp.action.show_response",
-        defaultValue: false)) {
-      print("Got Action Response (Real): ${response.toXmlString()}");
-    }
-
-    List<XmlElement> results =
-        response.children.whereType<XmlElement>().toList();
-    var map = <String, String>{};
-    for (XmlElement r in results) {
-      map[r.name.local] = r.text;
-    }
-    return map;
-  }
-}
