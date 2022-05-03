@@ -1,38 +1,48 @@
 library audio_cast;
 
 import 'dart:async';
+import 'dart:typed_data';
 
-import 'package:audio_cast/src/adapter/adapter.dart' if (dart.library.html) 'package:audio_cast/src/adapter/adapter_web.dart';
+import 'package:audio_cast/src/adapter/adapter.dart'
+    if (dart.library.html) 'package:audio_cast/src/adapter/adapter_web.dart';
 import 'package:audio_cast/src/adapter/cast_adapter.dart';
-import 'package:audio_cast/src/state_notifers.dart';
-import 'package:audio_cast/src/utils.dart';
+import 'package:audio_cast/src/util/state_notifiers.dart';
+import 'package:audio_cast/src/util/utils.dart';
 
 bool _engineInitiated = false;
 
 final DeviceListNotifier _devices = DeviceListNotifier();
-final CurrentPlaybackStateNotifier _currentPlaybackState = CurrentPlaybackStateNotifier();
+final CurrentPlaybackStateNotifier _currentPlaybackState =
+    CurrentPlaybackStateNotifier();
 final CurrentCastStateNotifier currentCastState = CurrentCastStateNotifier();
 
 class AudioCast {
   static Device? _currentPlaybackDevice;
   static final Set<Function> listeners = {};
 
-  static void initialize({bool debugPrint = true, bool catchErrors = true}) async {
+  static void initialize(
+      {bool debugPrint = true, bool catchErrors = true}) async {
     if (_engineInitiated) return;
     _engineInitiated = true;
 
     flagDebugPrint = debugPrint;
     flagCatchErrors = catchErrors;
 
-    try{
+    try {
       //initialize adapters
-      adapters.forEach((adapter) => adapter.initialize());
+      for (var adapter in adapters) {
+        adapter.initialize();
+      }
 
-      listeners.add(currentCastState.addListener((CastState castState){
-        if (castState == CastState.DISCONNECTED) {
-          adapters.forEach((adapter) => adapter.startDiscovery());
+      listeners.add(currentCastState.addListener((CastState castState) {
+        if (castState == CastState.disconnected) {
+          for (var adapter in adapters) {
+            adapter.startDiscovery();
+          }
         } else {
-          adapters.forEach((adapter) => adapter.cancelDiscovery());
+          for (var adapter in adapters) {
+            adapter.cancelDiscovery();
+          }
         }
       }));
 
@@ -40,24 +50,28 @@ class AudioCast {
       _refreshDeviceList();
 
       //Monitor listeners to refresh the device list
-      adapters.forEach((adapter) {
-        listeners.add(adapter.devices.addListener((_) =>  _refreshDeviceList()));
-      });
-    }catch(e){
+      for (var adapter in adapters) {
+        listeners.add(adapter.devices.addListener((_) => _refreshDeviceList()));
+      }
+    } catch (e) {
       errorDebugPrint('initialize($debugPrint, $catchErrors)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static void shutdown() async {
-    if (currentCastState.state == CastState.CONNECTED) {
+    if (currentCastState.isConnected) {
       await disconnect();
     }
 
-    adapters.forEach((adapter) => adapter.cancelDiscovery());
+    for (var adapter in adapters) {
+      adapter.cancelDiscovery();
+    }
 
     //remove listeners
-    listeners.forEach((removeListener) => removeListener());
+    for (var removeListener in listeners) {
+      removeListener();
+    }
     listeners.clear();
 
     _engineInitiated = false;
@@ -66,8 +80,8 @@ class AudioCast {
   static Future<void> connectToDevice(Device device) async {
     try {
       //not connected to a device
-      if (currentCastState.state == CastState.DISCONNECTED) {
-        currentCastState.setState(CastState.CONNECTING);
+      if (currentCastState.isDisconnected) {
+        currentCastState.setState(CastState.connecting);
         await adapters[device.adapterId].connect(device);
       }
       //connected to a cast device
@@ -78,134 +92,167 @@ class AudioCast {
           await _currentAdapter.disconnect();
 
           //connect to new device
-          currentCastState.setState(CastState.CONNECTING);
+          currentCastState.setState(CastState.connecting);
           await adapters[device.adapterId].connect(device);
         }
       }
 
       //connecting succeeded
       _currentPlaybackDevice = device;
-      currentCastState.setState(CastState.CONNECTED);
+      currentCastState.setState(CastState.connected);
     }
     //connecting failed
     catch (e) {
       _currentPlaybackDevice = null;
-      currentCastState.setState(CastState.DISCONNECTED);
+      currentCastState.setState(CastState.disconnected);
 
       errorDebugPrint('connectToDevice($device)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static Future<void> castAudioFromUrl(String url,
-      {Duration? start, MediaData? mediaData}) async {
+      {MediaData? mediaData}) async {
     try {
       mediaData ??= MediaData(title: url);
 
-      switch (currentCastState.state) {
-        case CastState.DISCONNECTED:
-          throw ('Status: CastState.DISCONNECTED, no device is currently connected.');
-        case CastState.CONNECTING:
-          throw ('Status: CastState.CONNECTING, you are currently not connected to a device.');
-          break;
-        case CastState.CONNECTED:
-          _currentAdapter.castUrl(url, mediaData, start);
-          await play();
-          break;
+      if (currentCastState.isConnected) {
+        await _currentAdapter.castUrl(url, mediaData);
+        await play();
+      } else {
+        throw ('no device is currently connected.');
       }
-    } catch(e) {
-      errorDebugPrint('castAudioFromUrl($url, $start, $mediaData)', e);
-      if(!flagCatchErrors) rethrow;
+    } catch (e) {
+      errorDebugPrint('castAudioFromUrl($url, $mediaData)', e);
+      if (!flagCatchErrors) rethrow;
+    }
+  }
+
+  /// This method plays an mp3 from bytes
+  static Future<void> castBytes(Uint8List bytes,
+      {MediaData? mediaData, Duration? start}) async {
+    try {
+      mediaData ??= MediaData(title: '');
+
+      if (currentCastState.isConnected) {
+        await _currentAdapter.castBytes(bytes, mediaData, start);
+        await play();
+      } else {
+        throw ('no device is currently connected.');
+      }
+    } catch (e) {
+      errorDebugPrint('castAudioFromBytes(${bytes.length}, $mediaData, $start)', e);
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static Future<void> disconnect() async {
     try {
-      if (currentCastState.state == CastState.DISCONNECTED) throw 'Status: CastState.DISCONNECTED, no device is currently connected.';
-        if(_currentPlaybackDevice == null) throw 'No device is currently connected.';
-      if (currentCastState.state == CastState.CONNECTING) throw ('Status: CastState.CONNECTING, you are currently not connected to a device.');
+      if (currentCastState.isDisconnected) {
+        throw 'Status: CastState.DISCONNECTED, no device is currently connected.';
+      }
+      if (_currentPlaybackDevice == null) {
+        throw 'No device is currently connected.';
+      }
+      if (currentCastState.isConnecting) {
+        throw ('Status: CastState.CONNECTING, you are currently not connected to a device.');
+      }
 
       await _currentAdapter.disconnect();
       _currentPlaybackDevice = null;
-      currentCastState.setState(CastState.DISCONNECTED);
-    } catch(e) {
+      currentCastState.setState(CastState.disconnected);
+    } catch (e) {
       errorDebugPrint('disconnect()', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static Future<void> play() async {
     try {
-      if (_currentPlaybackState.state == PlaybackState.PLAYING) throw ('Audio is already playing');
+      if (_currentPlaybackState.isPlaying) {
+        throw ('Audio is already playing');
+      }
 
       await _currentAdapter.play();
 
-      _currentPlaybackState.setPlaybackState(PlaybackState.PLAYING);
-    } catch(e) {
+      _currentPlaybackState.setPlaybackState(PlaybackState.playing);
+    } catch (e) {
       errorDebugPrint('play()', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static Future<void> pause() async {
     try {
-      if (_currentPlaybackState.state != PlaybackState.PLAYING) throw ('Audio isn\'t playing so it cant\'t be paused');
+      if (!_currentPlaybackState.isPlaying) {
+        throw ('Audio isn\'t playing so it cant\'t be paused');
+      }
 
       await _currentAdapter.pause();
-      _currentPlaybackState.setPlaybackState(PlaybackState.PAUSED);
-    } catch(e) {
+      _currentPlaybackState.setPlaybackState(PlaybackState.paused);
+    } catch (e) {
       errorDebugPrint('pause()', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
-  static Future<void> fastForward({Duration duration = const Duration(seconds: 10)}) async {
+  static Future<void> fastForward(
+      {Duration duration = const Duration(seconds: 10)}) async {
     try {
       final currentPosition = await getPosition();
       if (currentPosition == null) throw ('Position can\'t be null');
 
-      await setPosition(Duration(seconds: currentPosition.inSeconds + duration.inSeconds));
-    } catch(e) {
+      await setPosition(
+          Duration(seconds: currentPosition.inSeconds + duration.inSeconds));
+    } catch (e) {
       errorDebugPrint('fastForward($duration)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
-  static Future<void> rewind({Duration duration = const Duration(seconds: 10)}) async {
+  static Future<void> rewind(
+      {Duration duration = const Duration(seconds: 10)}) async {
     try {
       final currentPosition = await getPosition();
       if (currentPosition == null) throw ('Position can\'t be null');
 
-        await setPosition(Duration(
-            seconds: currentPosition.inSeconds - duration.inSeconds < 0
-                ? 0
-                : currentPosition.inSeconds - duration.inSeconds));
-    } catch(e) {
+      await setPosition(Duration(
+          seconds: currentPosition.inSeconds - duration.inSeconds < 0
+              ? 0
+              : currentPosition.inSeconds - duration.inSeconds));
+    } catch (e) {
       errorDebugPrint('rewind($duration)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static Future<void> setPosition(Duration position) async {
     try {
-      if (_currentPlaybackState.state == PlaybackState.NO_AUDIO) throw ('No audio is currently playing');
+      if (!_currentPlaybackState.hasAudio) {
+        throw ('No audio is currently playing');
+      }
 
       await _currentAdapter.setPosition(position);
-    } catch(e) {
+    } catch (e) {
       errorDebugPrint('setPosition($position)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
   static Future<Duration?> getPosition() async {
     try {
-      if (_currentPlaybackState.state == PlaybackState.NO_AUDIO) throw ('No audio is currently playing');
+      if (!_currentPlaybackState.hasAudio) {
+        throw ('No audio is currently playing');
+      }
 
       return _currentAdapter.getPosition();
-    } catch(e) {
+    } catch (e) {
       errorDebugPrint('getPosition()', e);
-      if(!flagCatchErrors) rethrow;
-      else return null;
+      if (!flagCatchErrors) {
+        rethrow;
+      } else {
+        return null;
+      }
     }
   }
 
@@ -215,10 +262,11 @@ class AudioCast {
 
       if (currentVolume == null) throw ('Current volume can\'t be null');
 
-      await _currentAdapter.setVolume(currentVolume - volume < 0 ? 0 : currentVolume - volume);
-    } catch(e) {
+      await _currentAdapter
+          .setVolume(currentVolume - volume < 0 ? 0 : currentVolume - volume);
+    } catch (e) {
       errorDebugPrint('lowerVolume($volume)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
@@ -229,9 +277,9 @@ class AudioCast {
       if (currentVolume == null) throw ('Current volume can\'t be null');
 
       await _currentAdapter.setVolume(currentVolume + volume);
-    } catch(e) {
+    } catch (e) {
       errorDebugPrint('increaseVolume($volume)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
@@ -240,17 +288,20 @@ class AudioCast {
       await _currentAdapter.setVolume(volume);
     } catch (e) {
       errorDebugPrint('setVolume($volume)', e);
-      if(!flagCatchErrors) rethrow;
+      if (!flagCatchErrors) rethrow;
     }
   }
 
-  static Future<int?> getVolume()  async {
+  static Future<int?> getVolume() async {
     try {
       return await _currentAdapter.getVolume();
     } catch (e) {
       errorDebugPrint('getVolume()', e);
-      if(!flagCatchErrors) rethrow;
-      else return null;
+      if (!flagCatchErrors) {
+        rethrow;
+      } else {
+        return null;
+      }
     }
   }
 
@@ -259,7 +310,9 @@ class AudioCast {
 
   static void _refreshDeviceList() {
     var newList = <Device>{};
-    adapters.forEach((adapter) => newList.addAll(adapter.devices.state));
+    for (var adapter in adapters) {
+      newList.addAll(adapter.devices.state);
+    }
 
     _devices.setDevices(newList);
   }
@@ -270,11 +323,12 @@ class AudioCast {
       _currentPlaybackState.stream;
 }
 
-enum CastType { CHROMECAST, AIRPLAY, DLNA, FIRETV }
-enum PlaybackState { PLAYING, PAUSED, BUFFERING, NO_AUDIO }
+enum CastType { chromecast, airplay, dlna, firetv }
+enum PlaybackState { playing, paused, buffering, noAudio }
 
 class Device {
-  const Device(this.host, this.name, this.port, this.type, this.adapterId, {this.params});
+  const Device(this.host, this.name, this.port, this.type, this.adapterId,
+      {this.params});
 
   final String? host, name;
   final int port, adapterId;
@@ -285,8 +339,8 @@ class Device {
   String toString() => 'Device($name, $host:$port, ${type.toString()})';
 
   @override
-  bool operator==(other) {
-    if(other is! Device) {
+  bool operator ==(other) {
+    if (other is! Device) {
       return false;
     }
 
@@ -298,7 +352,8 @@ class Device {
 }
 
 class MediaData {
-  const MediaData({this.title = 'null', this.album = 'null', this.artist = 'null'});
+  const MediaData(
+      {this.title = 'null', this.album = 'null', this.artist = 'null'});
 
   final String title, album, artist;
 }

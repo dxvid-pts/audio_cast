@@ -1,20 +1,28 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-enum CastState { CONNECTING, CONNECTED, DISCONNECTED }
+enum CastState { connecting, connected, disconnected }
 
 bool flagDebugPrint = true;
 bool flagCatchErrors = true;
 
-Uint8List cutMp3(Uint8List bytes, Duration startingPoint, int bitRate, Duration totalDuration) {
+Uint8List cutMp3(Uint8List bytes, Duration startingPoint, int bitRate,
+    Duration totalDuration) {
   return Uint8List.fromList(<int>[
     ...bytes.sublist(0, _getHeaderLength(bytes)).toList(),
     ...bytes
         .sublist(
-            bytes.length -
-                _getByteLengthFromDuration(
-                    bitRate, Duration(seconds: totalDuration.inSeconds - startingPoint.inSeconds < 0 ? 0 : totalDuration.inSeconds - startingPoint.inSeconds)),
-            bytes.length)
+          bytes.length -
+              _getByteLengthFromDuration(
+                bitRate,
+                Duration(
+                  seconds: totalDuration.inSeconds - startingPoint.inSeconds < 0
+                      ? 0
+                      : totalDuration.inSeconds - startingPoint.inSeconds,
+                ),
+              ),
+          bytes.length,
+        )
         .toList(),
   ]);
 }

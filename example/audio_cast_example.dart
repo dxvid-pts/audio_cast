@@ -19,7 +19,6 @@ void main() async {
       await AudioCast.castAudioFromUrl(
         'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
         mediaData: MediaData(title: 'testTitle', album: 'album'),
-        start: const Duration(seconds: 30),
       );
 
       await Future.delayed(Duration(seconds: 5));
